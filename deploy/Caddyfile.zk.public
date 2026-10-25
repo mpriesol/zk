@@ -1,0 +1,30 @@
+# INSIDE the existing hub.biketrek.sk site block, BEFORE its SPA fallback handle.
+# Preserve all existing /api, /data, /sps and unrelated site routes.
+# Public canonical URL: https://zimnykurz.sk/priprava
+# Public frontend proxy maps /priprava/* -> https://hub.biketrek.sk/zk/*.
+@cestouZimyGateway path /zk /zk/*
+handle @cestouZimyGateway {
+    # Restore the canonical prefix before handing the request to Node.
+    uri path_regexp ^/zk /priprava
+    request_body {
+        max_size 1MB
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        -Server
+    }
+    reverse_proxy zk-app:3000 {
+        header_up Host zimnykurz.sk
+        header_up X-Forwarded-Host zimnykurz.sk
+        header_up X-Forwarded-Proto https
+        # {client_ip} is the socket peer unless explicitly trusted front proxy
+        # addresses were configured in Caddy global server options.
+        # Never copy an arbitrary inbound X-Real-IP header here.
+        header_up X-Real-IP {client_ip}
+        # Keep browser Origin unchanged for the app's CSRF checks.
+        header_up -Oai-Authenticated-User-Id
+        header_up -Oai-Authenticated-User-Email
+        header_up -Oai-Authenticated-User-Full-Name
+    }
+}

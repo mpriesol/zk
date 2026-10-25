@@ -1,0 +1,15 @@
+# OPTIONAL alternative ONLY if the existing zimnykurz.sk website is served by
+# this same Caddy/network. Insert INSIDE its existing site block before fallback.
+# This direct route does not require the external /zk gateway round trip.
+@cestouZimyPublic path /priprava /priprava/*
+handle @cestouZimyPublic {
+    reverse_proxy zk-app:3000 {
+        header_up Host zimnykurz.sk
+        header_up X-Forwarded-Host zimnykurz.sk
+        header_up X-Forwarded-Proto https
+        header_up X-Real-IP {client_ip}
+        header_up -Oai-Authenticated-User-Id
+        header_up -Oai-Authenticated-User-Email
+        header_up -Oai-Authenticated-User-Full-Name
+    }
+}

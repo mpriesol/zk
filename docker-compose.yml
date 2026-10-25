@@ -1,0 +1,65 @@
+# Dedicated stack: docker compose --env-file zk.env -p cestou-zimy up -d --build
+# Requires Docker Compose >= 2.30 for env_file format: raw.
+name: cestou-zimy
+services:
+  zk-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_URL: ${APP_URL:?Set APP_URL using --env-file zk.env}
+    image: cestou-zimy:local
+    restart: unless-stopped
+    init: true
+    env_file:
+      - path: ./zk.env
+        format: raw
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATABASE_PATH: /data/cestou-zimy.sqlite
+    expose:
+      - "3000"
+    # No host port: only the existing Caddy reaches the internal service.
+    volumes:
+      - zk_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+    networks:
+      hubnet:
+        aliases:
+          - zk-app
+
+volumes:
+  zk_data:
+
+networks:
+  hubnet:
+    external: true
+    name: inventory-hub-net

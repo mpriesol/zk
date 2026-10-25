@@ -1,0 +1,6 @@
+# Only esbuild requires an installation script in this application.
+strictDepBuilds: true
+allowBuilds:
+  esbuild: true
+  fsevents: false
+  sharp: false
