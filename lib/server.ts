@@ -149,7 +149,9 @@ const member = (r: any, privateFields = false): Member => ({
   id: r.id,
   courseId: r.course_id,
   userId: privateFields ? r.user_id : null,
-  ...(privateFields ? { email: r.email } : {}),
+  ...(privateFields && !r.email.endsWith("@accounts.cestou-zimy.invalid")
+    ? { email: r.email }
+    : {}),
   nickname: r.nickname,
   role: r.role,
   active: !!r.active,
@@ -210,7 +212,7 @@ export async function bootstrap(
       .bind(cid, JSON.stringify(course)),
     db
       .prepare(
-        "INSERT OR IGNORE INTO members(id,course_id,user_id,email,nickname,role,active,animations,joined_at) VALUES(?,?,?,?,?,?,1,1,?)",
+        "INSERT OR IGNORE INTO members(id,course_id,user_id,email,nickname,role,active,animations,joined_at) SELECT ?,?,?,?,?,?,1,1,? WHERE changes()=1",
       )
       .bind(
         uid(),
@@ -309,7 +311,11 @@ async function authenticate(
     cid,
     identity.userId,
   );
-  if (!r) {
+  if (
+    !r &&
+    identity.emailVerified !== false &&
+    !identity.email.toLowerCase().endsWith("@accounts.cestou-zimy.invalid")
+  ) {
     r = await one(
       db,
       "SELECT * FROM members WHERE course_id=? AND email=? AND user_id IS NULL AND active=1",
@@ -582,7 +588,16 @@ export async function handleRequest(
     if (path === "/api/health") return json({ ok: true });
     if (path === "/api/identity")
       return json({
-        identity,
+        identity: identity
+          ? {
+              ...identity,
+              email: identity.email
+                .toLowerCase()
+                .endsWith("@accounts.cestou-zimy.invalid")
+                ? undefined
+                : identity.email,
+            }
+          : null,
         needsSetup: !(await one(
           db,
           "SELECT id FROM courses WHERE id=?",
@@ -824,7 +839,7 @@ export async function handleRequest(
           records = list.map((m) => [
             m.id,
             m.nickname,
-            m.email,
+            m.email.endsWith("@accounts.cestou-zimy.invalid") ? "" : m.email,
             m.role,
             m.active,
             m.animations,
@@ -1488,6 +1503,11 @@ export async function handleRequest(
           role = z
             .enum(["participant", "admin"])
             .parse(b.role || "participant");
+        if (email.endsWith("@accounts.cestou-zimy.invalid"))
+          fail(
+            400,
+            "Účet s prezývkou nemá e-mailovú schránku. Použi pozývací odkaz.",
+          );
         const existing = await one(
           db,
           "SELECT id FROM members WHERE course_id=? AND email=?",
@@ -1528,6 +1548,11 @@ export async function handleRequest(
           cid,
         );
         if (!m) fail(404, "Aktívny člen sa nenašiel.");
+        if (m.email.toLowerCase().endsWith("@accounts.cestou-zimy.invalid"))
+          fail(
+            400,
+            "Účet s prezývkou nemá e-mailovú schránku. Použi pozývací odkaz.",
+          );
         await enqueueInvite(db, cid, m.id, m.email, course, cfg, now);
         result.warning = emailConfigured(cfg)
           ? "Pozvánka je vo fronte."
@@ -2119,7 +2144,11 @@ async function enqueueInvite(
   now: string,
 ) {
   // Email is transactional; creating membership never opts in to newsletters.
-  if (!emailConfigured(cfg)) return;
+  if (
+    !emailConfigured(cfg) ||
+    email.toLowerCase().endsWith("@accounts.cestou-zimy.invalid")
+  )
+    return;
   await run(
     db,
     "INSERT INTO outbox(id,course_id,member_id,kind,reference_id,payload,status,attempts,next_attempt,created_at) VALUES(?,?,?,?,?,?,?,0,?,?)",

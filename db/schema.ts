@@ -190,3 +190,56 @@ export const recalculationPreviews = sqliteTable("recalculation_previews", {
   fingerprint: text("fingerprint").notNull(),
   expiresAt: text("expires_at").notNull(),
 });
+
+export const membershipRequests = sqliteTable(
+  "membership_requests",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id").notNull(),
+    userId: text("user_id").notNull(),
+    status: text("status").notNull(),
+    createdAt: text("created_at").notNull(),
+    reviewedAt: text("reviewed_at"),
+    reviewedBy: text("reviewed_by"),
+  },
+  (t) => [uniqueIndex("membership_request_user").on(t.courseId, t.userId)],
+);
+export const registrationInvites = sqliteTable("registration_invites", {
+  id: text("id").primaryKey(),
+  courseId: text("course_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  label: text("label").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  maxUses: integer("max_uses").notNull(),
+  uses: integer("uses").notNull().default(0),
+  revoked: integer("revoked").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  createdBy: text("created_by").notNull(),
+});
+export const passwordResets = sqliteTable("password_resets", {
+  id: text("id").primaryKey(),
+  courseId: text("course_id").notNull(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  createdAt: text("created_at").notNull(),
+  createdBy: text("created_by").notNull(),
+});
+export const authRateLimits = sqliteTable("auth_rate_limits", {
+  id: text("id").primaryKey(),
+  windowStart: integer("window_start").notNull(),
+  count: integer("count").notNull(),
+});
+
+// Only the trusted operator CLI writes this provenance. Public registrations
+// always use an internal email and can never acquire this exception.
+export const operatorPasswordAccounts = sqliteTable(
+  "operator_password_accounts",
+  {
+    userId: text("user_id").primaryKey(),
+    accountId: text("account_id").notNull().unique(),
+    email: text("email").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+);

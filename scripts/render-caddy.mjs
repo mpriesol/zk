@@ -4,12 +4,13 @@ import { readFileSync } from "node:fs";
 const value = process.env.APP_URL?.trim().replace(/\/$/, "");
 const variants = {
   "https://hub.biketrek.sk/zk": "../deploy/Caddyfile.zk",
+  "https://priprava.zimnykurz.sk": "../deploy/Caddyfile.zk.subdomain",
   "https://zimnykurz.sk/priprava": "../deploy/Caddyfile.zk.public",
 };
 const file = variants[value];
 if (!file) {
   console.error(
-    "APP_URL musí byť https://hub.biketrek.sk/zk alebo https://zimnykurz.sk/priprava. Načítaj konfiguráciu cez node --env-file=zk.env scripts/render-caddy.mjs.",
+    "APP_URL musí byť https://hub.biketrek.sk/zk, https://priprava.zimnykurz.sk alebo https://zimnykurz.sk/priprava. Načítaj konfiguráciu cez node --env-file=zk.env scripts/render-caddy.mjs.",
   );
   process.exit(1);
 }

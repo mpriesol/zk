@@ -1,10 +1,13 @@
-/** One APP_URL selects /zk now or /priprava later; browser and server use the same build setting. */
-export type AppBasePath = "/zk" | "/priprava";
+/** APP_URL selects the Hub prefix, legacy public prefix, or dedicated subdomain root. */
+export type AppBasePath = "" | "/zk" | "/priprava";
 declare const __CZ_BASE_PATH__: string | undefined;
-const BASES: AppBasePath[] = ["/zk", "/priprava"];
+const HISTORICAL_BASES = ["/zk", "/priprava"] as const;
+const BASES: AppBasePath[] = ["", ...HISTORICAL_BASES];
 function checkedBase(value: string): AppBasePath {
   if (!BASES.includes(value as AppBasePath))
-    throw new Error("Podporované cesty aplikácie sú iba /zk a /priprava.");
+    throw new Error(
+      "Podporované cesty aplikácie sú koreň domény, /zk a /priprava.",
+    );
   return value as AppBasePath;
 }
 export function basePathFromUrl(value: string): AppBasePath {
@@ -40,13 +43,19 @@ export function appPath(path = "/", base: AppBasePath = APP_BASE_PATH): string {
   )
     return base + "/";
   // Normalize stored app-relative links after changing origin/prefix; this does not create an inbound HTTP alias.
-  for (const previous of BASES) {
+  for (const previous of HISTORICAL_BASES) {
     if (
       path === previous ||
       path.startsWith(previous + "/") ||
       path.startsWith(previous + "?")
-    )
-      return base + path.slice(previous.length);
+    ) {
+      const suffix = path.slice(previous.length);
+      return base
+        ? base + suffix
+        : suffix.startsWith("/")
+          ? suffix
+          : "/" + suffix;
+    }
   }
   return base + path;
 }

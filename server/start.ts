@@ -7,12 +7,22 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SQLiteDatabase, migrateApp } from "./sqlite.ts";
+import { databaseOperation, queuedDatabase } from "./database-queue.ts";
 import {
   createAuth,
   authSettingsFromEnv,
   createMailer,
   migrateAuth,
+  getAuthSettings,
+  passwordEnabled,
+  emailOtpEnabled,
+  isInternalEmail,
 } from "./auth.ts";
+import {
+  accountEndpoint,
+  credentialUser,
+  type AccountSession,
+} from "./accounts.ts";
 import { handleRequest, type ServerConfig } from "../lib/server.ts";
 import { drainOutbox, type OutboxConfig } from "../lib/outbox.ts";
 import type { Identity } from "../lib/types.ts";
@@ -28,6 +38,8 @@ import {
 const AUTH_ROUTES = new Map([
   ["/api/auth/email-otp/send-verification-otp", "POST"],
   ["/api/auth/sign-in/email-otp", "POST"],
+  ["/api/auth/sign-in/username", "POST"],
+  ["/api/auth/change-password", "POST"],
   ["/api/auth/sign-out", "POST"],
   ["/api/auth/get-session", "GET"],
 ]);
@@ -39,9 +51,10 @@ export function createApiHandler(
   if (!config.siteUrl)
     throw new Error("API konfigurácia vyžaduje úplnú siteUrl z APP_URL.");
   const basePath = basePathFromUrl(config.siteUrl);
+  const settings = getAuthSettings(auth);
   if (auth.options.basePath !== appPath("/api/auth", basePath))
     throw new Error("Prihlasovanie a API používajú rozdielnu cestu aplikácie.");
-  return async (request: Request): Promise<Response> => {
+  const handle = async (request: Request): Promise<Response> => {
     const url = new URL(request.url),
       fullPath = url.pathname;
     if (fullPath === "/healthz") {
@@ -63,33 +76,77 @@ export function createApiHandler(
           { error: "Nepodporovaná prihlasovacia operácia." },
           { status: 404, headers: { "Cache-Control": "no-store" } },
         );
+      if (request.method === "POST") {
+        const allowedOrigins = [
+          new URL(settings.appUrl).origin,
+          ...(settings.production ? [] : settings.trustedOrigins || []),
+        ];
+        if (!allowedOrigins.includes(request.headers.get("origin") || ""))
+          return Response.json(
+            { error: "Táto požiadavka nepochádza z aplikácie." },
+            { status: 403, headers: { "Cache-Control": "no-store" } },
+          );
+      }
       const response = await auth.handler(request);
       response.headers.set("Cache-Control", "private, no-store");
+      // Better Auth's public JSON includes its database-only email and session token.
+      // Cookies remain intact; application clients never need either value in JSON.
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const value = await response.json();
+        if (value && typeof value === "object") {
+          if (
+            value.user &&
+            typeof value.user.email === "string" &&
+            isInternalEmail(value.user.email)
+          )
+            delete value.user.email;
+          delete value.token;
+          if (value.session) delete value.session.token;
+        }
+        const headers = new Headers(response.headers);
+        headers.delete("Content-Length");
+        return Response.json(value, { status: response.status, headers });
+      }
       return response;
     }
     const sessionResponse = await auth.api.getSession({
       headers: request.headers,
       asResponse: true,
     });
-    const session = await sessionResponse.json();
-    const identity: Identity | null = session?.user?.emailVerified
+    const rawSession = (await sessionResponse.json()) as AccountSession | null;
+    const verifiedEmail =
+      !!rawSession?.user?.emailVerified &&
+      !isInternalEmail(rawSession.user.email);
+    const passwordIdentity =
+      !!rawSession?.user?.id &&
+      passwordEnabled(settings) &&
+      credentialUser(db, rawSession.user.id);
+    const session =
+      rawSession && (verifiedEmail || passwordIdentity) ? rawSession : null;
+    const identity: Identity | null = session
       ? {
           userId: session.user.id,
           email: session.user.email,
-          displayName: session.user.name,
+          emailVerified: session.user.emailVerified,
+          displayName: passwordIdentity
+            ? session.user.displayUsername ||
+              session.user.username ||
+              "Účastník"
+            : session.user.name,
         }
       : null;
     url.pathname = path;
-    const response = await handleRequest(
-      new Request(url, request),
-      identity,
-      db,
-      config,
-    );
-    for (const cookie of sessionResponse.headers.getSetCookie())
-      response.headers.append("Set-Cookie", cookie);
+    const response =
+      (await accountEndpoint(request, path, session, db, auth)) ||
+      (await handleRequest(new Request(url, request), identity, db, config));
+    // A new signup cookie takes precedence over cleanup of an expired cookie.
+    if (!response.headers.getSetCookie().length)
+      for (const cookie of sessionResponse.headers.getSetCookie())
+        response.headers.append("Set-Cookie", cookie);
     return response;
   };
+  return (request: Request): Promise<Response> =>
+    databaseOperation(db, () => handle(request));
 }
 async function bodyOf(request: IncomingMessage): Promise<Buffer | undefined> {
   if (request.method === "GET" || request.method === "HEAD") return;
@@ -193,9 +250,17 @@ export async function startServer() {
     vapidPublicKey: process.env.VAPID_PUBLIC_KEY,
     vapidPrivateKey: process.env.VAPID_PRIVATE_KEY,
     vapidSubject: process.env.VAPID_SUBJECT,
-    emailEnabled: settings.mailMode === "file" || !!settings.smtpHost,
+    emailEnabled:
+      emailOtpEnabled(settings) &&
+      (settings.mailMode === "file" || !!settings.smtpHost),
     emailFrom: settings.mailFrom,
     invitationSender: async (payload) => {
+      if (!emailOtpEnabled(settings) || isInternalEmail(payload.to))
+        return {
+          status: "failed",
+          httpStatus: null,
+          reason: "E-mailové pozvánky nie sú pre tento účet dostupné.",
+        };
       try {
         await mail({
           to: payload.to,
@@ -359,7 +424,7 @@ export async function startServer() {
         );
         return;
       }
-      if (path === "/" || path === basePath) {
+      if (basePath && (path === "/" || path === basePath)) {
         res.writeHead(308, {
           Location:
             appPath("/", basePath) +
@@ -438,10 +503,11 @@ export async function startServer() {
       );
     }
   });
+  const outboxDatabase = queuedDatabase(db);
   let draining: Promise<unknown> | null = null;
   const drain = () => {
     if (draining) return;
-    draining = drainOutbox(db, config)
+    draining = drainOutbox(outboxDatabase, config)
       .catch((error) =>
         console.error(
           "Outbox processing failed:",

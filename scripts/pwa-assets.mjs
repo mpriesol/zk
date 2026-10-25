@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 
 /** The supported application base selected by APP_URL for this build/runtime. */
 function validBase(basePath) {
-  if (basePath !== "/zk" && basePath !== "/priprava")
-    throw new Error("PWA base path must be /zk or /priprava.");
+  if (basePath !== "" && basePath !== "/zk" && basePath !== "/priprava")
+    throw new Error("PWA base path must be the domain root, /zk or /priprava.");
   return basePath;
 }
 export function createManifest(basePath) {

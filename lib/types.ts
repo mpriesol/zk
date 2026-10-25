@@ -177,4 +177,5 @@ export interface Identity {
   userId: string;
   email: string;
   displayName: string;
+  emailVerified?: boolean;
 }

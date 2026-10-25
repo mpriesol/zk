@@ -1,6 +1,6 @@
 # Nasadenie Cestou Zimy na vlastnom serveri
 
-Projekt je samostatná aplikácia v repozitári `mpriesol/zk`. Runtime tvorí Node.js 24, React SPA a SQLite v trvalom volume. Prihlásenie zabezpečuje Better Auth s jednorazovým e-mailovým kódom cez SMTP. Nevyžaduje ChatGPT účet, Supabase ani novú platenú službu. Web push potrebuje vlastný VAPID pár a HTTPS.
+Projekt je samostatná aplikácia v repozitári `mpriesol/zk`. Runtime tvorí Node.js 24, React SPA a SQLite v trvalom volume. Prihlásenie zabezpečuje Better Auth, predvolene používateľským menom a heslom bez SMTP. E-mailový jednorazový kód možno voliteľne zapnúť cez SMTP. Nevyžaduje ChatGPT účet, Supabase ani novú platenú službu. Web push potrebuje vlastný VAPID pár a HTTPS.
 
 ## Overená infraštruktúra a hranice overenia
 
@@ -10,26 +10,29 @@ Projekt je samostatná aplikácia v repozitári `mpriesol/zk`. Runtime tvorí No
 - `mpriesol/inventory_hub/infra/Caddyfile`, blob `4f3591fc384ceec2fa6f616b27e0bef5e6d2c0a8`: obsahuje Hub `/api/*`, `/data/*` a frontend fallback. Tento súbor **neobsahuje aktuálne SPS smerovanie**, preto nesmie nahradiť skutočný serverový Caddyfile.
 - `mpriesol/sps/deploy/Caddyfile.snippet`, blob `84408ba6d3a27e010a94be1683b8d6797cec19f6`: SPS používa `/sps/*` a `sps-receiver:8080`; dané smerovanie zachovať.
 
-Živý server, jeho skutočné pripojenia, DNS, SMTP a HTTPS neboli z tohto pracovného prostredia overené. Repozitáre a bežiaca produkcia Hub/SPS neboli upravené; zmeny patria iba do repozitára aplikácie `mpriesol/zk`. Docker daemon nie je v pracovnom prostredí dostupný, preto build image a `docker compose up` treba overiť na cieľovom serveri. Lokálne testy zálohy/obnovy a renderovania Caddy šablóny sú skutočne spustiteľné: `node --experimental-strip-types --test tests/backup.test.ts`.
+Výstupom poskytnutým prevádzkovateľom boli potvrdené Docker Compose **5.0.2**, Caddy pripojený do sietí **inventory-hub-net** aj **sps-proxy** a aktuálny zdroj Caddyfile **`/opt/inventory-hub/caddy/Caddyfile`**. Tento výstup potvrdzuje uvedené predpoklady nasadenia, nie vykonané nasadenie ZK. Živý štart ZK, DNS, SMTP a HTTPS reťazec neboli z tohto pracovného prostredia overené. Repozitáre a bežiaca produkcia Hub/SPS neboli upravené; zmeny patria iba do repozitára aplikácie `mpriesol/zk`. Docker daemon nie je v pracovnom prostredí dostupný, preto build image a `docker compose up` treba overiť na cieľovom serveri. Lokálne testy zálohy/obnovy a renderovania Caddy šablóny sú skutočne spustiteľné: `node --experimental-strip-types --test tests/backup.test.ts`.
 
-**Skutočne overené:** oficiálny Caddy **2.11.7** lokálne načítal pripravený Hub fragment a prešlo 22 živých HTTP kontrol v oboch režimoch `APP_URL`: exact `/zk`, slash, zachovanie `/zk` aj prepis na `/priprava`, API/auth/SW cesty, query, POST body, Host/Origin/proto, odstránenie podvrhnutej identity/IP aj zachovanie Hub/SPS/fallback routes. Test používa lokálny stub backend a dočasný Caddy, nie produkciu. Opakovanie: `CADDY_BIN=/cesta/k/caddy node scripts/check-caddy.mjs`. To nepotvrdzuje frontendový nginx/Apache hosting, jeho TLS, DNS ani celý reťazec cez zimnykurz.sk.
+**Skutočne overené:** oficiálny Caddy **2.11.7** lokálne načítal všetky tri režimy `APP_URL` a prešlo **41 živých HTTP kontrol**: 13 Hub `/zk`, 13 alternatíva `/priprava` a 15 subdoména s koreňom `/`. Kontroly pokrývajú API/auth/SW cesty, query, POST body, Host/Origin/proto, odstránenie podvrhnutej identity/IP, bezpečnostné hlavičky, izoláciu hostov aj zachovanie Hub/SPS/fallback routes. Skutočný migračný fragment presmeroval `/zk` na koreň subdomény a `/zk/foo?x=1` na `/foo?x=1`. Test používa lokálny stub backend a dočasný Caddy, nie produkciu. Opakovanie: `CADDY_BIN=/cesta/k/caddy node scripts/check-caddy.mjs`. To nepotvrdzuje verejné TLS, DNS, vzdialený nginx/Apache hosting ani reťazec cez zimnykurz.sk.
 
 ## Prvé nasadenie a neskorší presun URL
 
 **Prvé nasadenie je určené pre https://hub.biketrek.sk/zk.** Potrebuje iba existujúci Hub server, nový samostatný kontajner a doplnenie jeho Caddy. Prístup k hostingu zimnykurz.sk toto prvé spustenie neblokuje. Tento dokument sám osebe nepotvrdzuje vykonané nasadenie.
 
-**Neskôr sa môže verejná adresa zmeniť na https://zimnykurz.sk/priprava**, keď bude overený a nastavený reverse proxy prístup k tomuto hostingu. Aplikácia fyzicky ostane na tom istom serveri aj v tom istom databázovom volume.
+**Preferovaná budúca adresa je https://priprava.zimnykurz.sk.** Potrebuje DNS záznam iba pre túto subdoménu a samostatný site v existujúcom Hub Caddy. Pôvodný web `zimnykurz.sk` a jeho menu zostanú bez zmien. Aplikácia fyzicky ostane na tom istom serveri aj v tom istom databázovom volume.
+
+Read-only kontrola repozitára [`jurajk/zkweb`](https://github.com/jurajk/zkweb) potvrdila statický build Gulp/Twig a [workflow](https://github.com/jurajk/zkweb/blob/master/.github/workflows/deploy.yml), ktorý publikuje `dist` na vetvu `gh-pages`; [CNAME](https://github.com/jurajk/zkweb/blob/master/CNAME) obsahuje `zimnykurz.sk`. Samotný PR v tomto repozitári nemôže pridať serverovú proxy pre aplikačné API. Subdoména tento problém rieši bez PR či zásahu do pôvodného webu. Audit repozitára sám osebe nepotvrdzuje aktuálne živé DNS. Alternatíva `https://zimnykurz.sk/priprava` zostáva pripravená pre prípad neskoršieho prístupu k skutočnej reverznej proxy.
 
 | Nastavenie `APP_URL` | Prehliadač a Node prefix | Hub Caddy `/zk/*` | Front hosting |
 |---|---|---|---|
 | `https://hub.biketrek.sk/zk` — prvé nasadenie | `/zk`, Host `hub.biketrek.sk` | Zachová cestu `/zk/*` | Netreba |
+| `https://priprava.zimnykurz.sk` — preferovaný presun | Koreň `/`, Host `priprava.zimnykurz.sk` | Presmeruje staré odkazy na novú adresu | DNS subdomény → Hub server; samostatný Caddy site |
 | `https://zimnykurz.sk/priprava` — neskorší presun | `/priprava`, Host `zimnykurz.sk` | Prepíše prefix `/zk` na `/priprava` | Proxy `/priprava/*` → `https://hub.biketrek.sk/zk/*` |
 
-**Jediné nastavenie je `APP_URL` v `zk.env`, vždy vrátane prefixu.** Z neho build odvodí assety, navigáciu, service worker aj manifest; runtime odvodí API, auth a cookie scope. Docker build vytvorí `build-config.json`; server pri štarte overí zhodu s runtime prefixom, aby nebežal starý frontend na novej URL. Po zmene `APP_URL` je potrebný **rebuild image, reštart iba ZK kontajnera a nové vygenerovanie ZK Caddy fragmentu**. Nie je potrebná ručná úprava zdrojového kódu ani samostatná premenná `APP_BASE_PATH`.
+**Jediné nastavenie je `APP_URL` v `zk.env`, s príslušným prefixom alebo bez neho pri subdoméne.** Z neho build odvodí assety, navigáciu, service worker aj manifest; runtime odvodí API, auth a cookie scope. Docker build vytvorí `build-config.json`; server pri štarte overí zhodu s runtime prefixom, aby nebežal starý frontend na novej URL. Po zmene `APP_URL` je potrebný **rebuild image, reštart iba ZK kontajnera a nové vygenerovanie ZK Caddy konfigurácie**. Nie je potrebná ručná úprava zdrojového kódu ani samostatná premenná `APP_BASE_PATH`.
 
 Docker build dostane `APP_URL` ako netajný build argument; runtime ju načíta z toho istého `zk.env`. Všetky Compose príkazy preto používajú `--env-file zk.env`. Ak má shell exportovanú inú `APP_URL`, odstráň toto prepísanie (`unset APP_URL`) pred spustením. Ostatné tajomstvá nie sú build argumenty a nepatria do image.
 
-Nový kontajner nepublikuje hostiteľský port, používa `inventory-hub-net` a nemení Hub/SPS Compose služby. V prvom režime je `/zk` skutočná účastnícka adresa. Po neskoršom presune je `/zk` technický upstream a účastníci používajú `/priprava` na novom origine. Prehliadač neprenesie cookie prihlásenia ani push povolenie na inú doménu; používateľ sa znovu prihlási a vedome zapne push na novej adrese. Server označuje push odbery originom a neposiela správy cez staré odbery iného originu. Starú nainštalovanú PWA treba odstrániť alebo ďalej nepoužívať.
+Nový kontajner nepublikuje hostiteľský port, používa `inventory-hub-net` a nemení Hub/SPS Compose služby. V prvom režime je `/zk` skutočná účastnícka adresa. Po preferovanom presune obsluhuje aplikáciu iba subdoména; staré `/zk` odkazy presmeruje Caddy. Iba pri alternatíve `/priprava` zostáva `/zk` technickým upstreamom verejnej proxy. Prehliadač neprenesie cookie prihlásenia ani push povolenie na inú doménu; používateľ sa znovu prihlási a vedome zapne push na novej adrese. Server označuje push odbery originom a neposiela správy cez staré odbery iného originu. Starú nainštalovanú PWA treba odstrániť alebo ďalej nepoužívať.
 
 ## Konfigurácia
 
@@ -37,11 +40,13 @@ Vyžaduje Docker Engine a Docker Compose **aspoň 2.30**, pretože `env_file.for
 
 | Premenná | Význam |
 |---|---|
-| `APP_URL` | Teraz `https://hub.biketrek.sk/zk`; neskôr `https://zimnykurz.sk/priprava`. Zmena vyžaduje rebuild a nový ZK Caddy fragment. |
+| `APP_URL` | Teraz `https://hub.biketrek.sk/zk`; preferovaný presun `https://priprava.zimnykurz.sk`. Alternatíva `https://zimnykurz.sk/priprava` potrebuje verejnú proxy. Zmena vyžaduje rebuild a novú ZK Caddy konfiguráciu. |
 | `BETTER_AUTH_SECRET` | Náhodný tajný reťazec aspoň 32 znakov; napr. vytvorený `openssl rand -base64 48`. Uchovať mimo Git a záloh verejného kódu. |
-| `BOOTSTRAP_ADMIN_EMAIL` | E-mail prvého organizátora. Použiť skutočnú schránku; nie demo konto. |
+| `AUTH_MODE` | Predvolene `password`: používateľské meno a heslo bez SMTP. Voliteľne `email` alebo `both`. |
+| `BOOTSTRAP_ADMIN_EMAIL` | Voliteľná súkromná adresa prvého admina pri vytvorení cez CLI; zároveň bootstrap e-mail v režime `email`/`both`. Heslové prihlásenie ju nevyžaduje. |
+| `REGISTRATION_OPEN` | Predvolene otvorené; `false` zastaví nové heslové registrácie vrátane pozvánok. |
 | `COURSE_ID` | Identifikátor ročníka, predvolene `cestou-zimy`. Nemeniť pri bežnom reštarte. |
-| `AUTH_MAIL_MODE` | V produkcii `smtp`. Vývojové `file` sa v produkcii odmieta. |
+| `AUTH_MAIL_MODE` | Pre produkčné e-maily `smtp`. `AUTH_MODE=password` e-maily nevyžaduje. Vývojové `file` sa v produkcii odmieta. |
 | `SMTP_HOST`, `SMTP_PORT` | Existujúci SMTP server a port, zvyčajne 587. |
 | `SMTP_SECURE` | `true` pre implicitné TLS na 465; pre 587 `false` s STARTTLS. |
 | `SMTP_USER`, `SMTP_PASSWORD` | SMTP prihlasovanie; možno vynechať iba pri úmyselne nakonfigurovanom dôveryhodnom relayi. |
@@ -50,27 +55,59 @@ Vyžaduje Docker Engine a Docker Compose **aspoň 2.30**, pretože `env_file.for
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Voliteľný web push; private key zostáva na serveri, subject je kontaktná `mailto:` alebo HTTPS adresa. Bez konfigurácie sa zapnutie push nepovažuje za úspešné. |
 | `DATABASE_PATH`, `HOST`, `PORT`, `NODE_ENV` | Compose nastavuje `/data/cestou-zimy.sqlite`, `0.0.0.0`, `3000`, `production`. |
 
-Produkčné SMTP treba otestovať skutočným prijatím OTP e-mailu, expiráciou, opätovným odoslaním a prihlásením pozvaného účastníka. Over SPF/DKIM/DMARC podľa existujúceho poskytovateľa. Neodosielaj skutočné pozvánky počas testovania bez zámeru organizátora.
+Ak zapneš `AUTH_MODE=email` alebo `both`, produkčné SMTP treba otestovať skutočným prijatím OTP e-mailu, expiráciou, opätovným odoslaním a prihlásením pozvaného účastníka. Pre `AUTH_MODE=password` tento krok nie je potrebný a nie je nutné na Hube inštalovať mailový server. Over SPF/DKIM/DMARC podľa existujúceho poskytovateľa. Neodosielaj skutočné pozvánky počas testovania bez zámeru organizátora.
 
 ## Spustenie samostatného stacku
 
 Pracuj v samostatnom adresári, napr. `/opt/cestou-zimy`. Nepoužívaj adresár ani Compose projekt Hubu.
 
+Nasledujúci postup je **prvé vytvorenie nového ZK stacku**, nie aktualizácia existujúcej inštalácie. Ak `/opt/cestou-zimy` alebo jeho `zk.env` už existuje, najprv skontroluj stav a konfiguráciu neprepisuj.
+
 ```sh
 git clone https://github.com/mpriesol/zk.git /opt/cestou-zimy
 cd /opt/cestou-zimy
+umask 077
 cp .env.example zk.env
 chmod 600 zk.env
-# Vyplň zk.env, pred ďalším krokom.
+```
+
+V `zk.env` nastav nasledujúce netajné hodnoty. Ostatné SMTP položky aj `BOOTSTRAP_ADMIN_EMAIL` môžu pri heslovom režime zostať prázdne:
+
+```dotenv
+APP_URL=https://hub.biketrek.sk/zk
+AUTH_MODE=password
+COURSE_ID=cestou-zimy
+TRUST_PROXY=1
+```
+
+Najprv over sieť a zostav iba nový image. Build potrebuje `APP_URL`; prihlasovacie tajomstvo v tejto chvíli ešte netreba:
+
+```sh
 docker compose version
 docker network inspect inventory-hub-net
 docker inspect inventory-hub-caddy-1 --format '{{json .NetworkSettings.Networks}}'
 docker compose --env-file zk.env -p cestou-zimy config --quiet
 docker compose --env-file zk.env -p cestou-zimy build
+```
+
+Vygeneruj tajomstvá **iba pri prvom nastavení** priamo do súkromného `zk.env`. Príkaz nič citlivé nevypíše na obrazovku. Najprv odstráni prázdne zástupné riadky troch generovaných hodnôt, aby nevznikli duplicity. Na existujúcej inštalácii tieto príkazy neopakuj:
+
+```sh
+sed -i '/^BETTER_AUTH_SECRET=/d; /^VAPID_PUBLIC_KEY=/d; /^VAPID_PRIVATE_KEY=/d' zk.env
+docker compose --env-file zk.env -p cestou-zimy run --rm --no-deps -T zk-app node scripts/generate-keys.mjs >> zk.env
+chmod 600 zk.env
+```
+
+Pre push ešte nastav `VAPID_SUBJECT` na kontaktnú `mailto:` alebo HTTPS adresu prevádzkovateľa. Bez kompletného VAPID nastavenia možno otestovať účty a aktivity, ale doručenie push ešte nie je pripravené. Potom spusti nový kontajner a vytvor prvého organizátora:
+
+```sh
 docker compose --env-file zk.env -p cestou-zimy up -d --no-deps zk-app
 docker compose --env-file zk.env -p cestou-zimy ps
 docker compose --env-file zk.env -p cestou-zimy logs --tail=80 zk-app
+docker compose --env-file zk.env -p cestou-zimy exec -it zk-app node --experimental-strip-types scripts/create-admin.ts
 ```
+
+CLI si vypýta zvolenú prezývku organizátora, skryté heslo a jeho potvrdenie. Žiadne konkrétne meno ani heslo nie je zabudované do aplikácie. Verejný prístup cez `/zk` sa sprístupní až doplnením Caddy podľa nasledujúcej časti. Samotný build ani zdravý kontajner neznamená, že je vonkajšia URL už funkčná.
 
 Ak sieť `inventory-hub-net` neexistuje alebo v nej nie je Caddy, najprv porovnaj skutočnú konfiguráciu servera. Nevytváraj ďalšiu rovnako vyzerajúcu sieť a neprepájaj Hub naslepo. Nový Compose projekt má vlastný volume `cestou-zimy_zk_data`, SQLite aj účty sú oddelené od Hub PostgreSQL a SPS.
 
@@ -78,11 +115,15 @@ Kontajner beží ako neprivilegovaný používateľ, root filesystem je read-onl
 
 ### Prvý organizátor
 
-Pred prvým spustením nastav `BOOTSTRAP_ADMIN_EMAIL` na svoju schránku. Otvor aplikáciu, požiadaj o kód a over ho cez skutočný e-mail. Až serverom overená identita s týmto e-mailom môže pri prvom načítaní `<aktívny prefix>/api/state` vytvoriť ešte neexistujúci kurz a členstvo organizátora. Frontend neponúka voľbu roly a neexistuje verejný bootstrap endpoint s univerzálnym heslom. Ak kurz už existuje, zmena tejto premennej neprepisuje jeho členov alebo role. Ďalších ľudí pozýva organizátor cez administráciu.
+Heslový režim používa vyššie uvedený serverový `scripts/create-admin.ts`. Skript vytvorí Better Auth účet a prvé členstvo organizátora iba na doteraz neexistujúcom kurze. Existujúcu inštaláciu odmietne; nie je nástrojom na preberanie účtov alebo prepis rolí. Prihlasovacie heslo sa nezobrazuje, neposiela do Git a nepatrí do argumentu príkazu ani `zk.env`.
+
+Po doplnení Caddy otvor `https://hub.biketrek.sk/zk` a prihlás sa vytvorenými údajmi. Účastníci si vytvárajú vlastnú prezývku a heslo; voliteľné celé meno je súkromné. S platnou pozvánkou sa aktivujú, bez nej čakajú na schválenie organizátorom. Ostatní účastníci vidia iba prezývku. Pre obnovu zabudnutého hesla organizátor vystaví súkromný jednorazový odkaz v administrácii; SMTP na tento postup netreba.
+
+Voliteľný režim `AUTH_MODE=email` alebo `both` môže na úplne novom kurze použiť `BOOTSTRAP_ADMIN_EMAIL` a skutočný e-mailový OTP. Existujúci kurz alebo roly zmena tejto premennej neprepisuje. Podrobnosti k účtom, pozvánkam, obnove a 30-dňovým session sú v [AUTH.md](AUTH.md).
 
 ## 1. Hub gateway: bezpečné doplnenie Caddy
 
-Toto je samostatný krok do existujúcej produkčnej konfigurácie; vykonaj ho až po odsúhlasení nasadenia. Nová služba používa existujúci Caddy aj siete.
+Toto je krok autorizovaného prvého nasadenia na Hub do existujúcej produkčnej konfigurácie. Nová služba používa existujúci Caddy aj siete; pracuj cez zálohu, kandidáta a validáciu.
 
 1. Zisti skutočný zdroj pripojeného Caddyfile:
 
@@ -90,15 +131,24 @@ Toto je samostatný krok do existujúcej produkčnej konfigurácie; vykonaj ho a
    docker inspect inventory-hub-caddy-1 --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}'
    ```
 
-2. Zálohuj **tento aktuálny súbor**, vrátane `/sps`, `/api`, `/data` a ostatných domén. Nepouži starý Caddyfile z repozitára ako náhradu.
+2. Zálohuj **tento aktuálny súbor**, vrátane `/sps`, `/api`, `/data` a ostatných domén. Nepouži starý Caddyfile z repozitára ako náhradu. Pre potvrdenú cestu priprav zálohu a kandidáta:
+
+   ```sh
+   zk_caddy_source=/opt/inventory-hub/caddy/Caddyfile
+   zk_caddy_backup="${zk_caddy_source}.before-zk-$(date +%Y%m%d-%H%M%S)"
+   cp -a "$zk_caddy_source" "$zk_caddy_backup"
+   cp -a "$zk_caddy_source" /tmp/Caddyfile.zk-candidate
+   ```
+
+   Ak výstup prvého kroku ukáže inú cestu, použi skutočný mount. Kandidát ostáva mimo repozitára.
 3. Vytvor reviewovateľný fragment:
 
    ```sh
    docker compose --env-file zk.env -p cestou-zimy run --rm --no-deps zk-app node scripts/render-caddy.mjs > deploy/Caddyfile.zk.rendered
    ```
 
-   Skript podľa `APP_URL` vyberie prvotný Hub fragment alebo budúci verejný fragment. Prázdnu, cudziu alebo neplatnú URL odmietne. Iba vypíše lokálny fragment, nemení server a nepotrebuje `ZK_DOMAIN`.
-4. Vlož celý **vygenerovaný** fragment (prvý režim vychádza z `deploy/Caddyfile.zk`, druhý z `deploy/Caddyfile.zk.public`) **dovnútra existujúceho `hub.biketrek.sk { ... }`**, pred fallback `handle`, ktorý obsluhuje Hub SPA. Zachovaj `/sps`, `/api`, `/data` a ostatné routes. Ilustračný diff:
+   Skript podľa `APP_URL` vyberie prvotný Hub fragment, samostatný site pre subdoménu alebo alternatívny fragment pre verejnú proxy. Prázdnu, cudziu alebo neplatnú URL odmietne. Iba vypíše lokálnu konfiguráciu, nemení server a nepotrebuje `ZK_DOMAIN`. V tomto prvom nasadení je `APP_URL=https://hub.biketrek.sk/zk`.
+4. Pri prvom Hub nasadení vlož do `/tmp/Caddyfile.zk-candidate` celý **vygenerovaný** fragment z `deploy/Caddyfile.zk` **dovnútra existujúceho `hub.biketrek.sk { ... }`**, pred fallback `handle`, ktorý obsluhuje Hub SPA. Zachovaj `/sps`, `/api`, `/data` a ostatné routes. Subdoménový variant je celý samostatný site a sem sa nevkladá; jeho postup je nižšie. Ilustračný diff:
 
    ```diff
     hub.biketrek.sk {
@@ -119,21 +169,56 @@ Toto je samostatný krok do existujúcej produkčnej konfigurácie; vykonaj ho a
 5. Skopíruj kandidáta do kontajnera ako `/tmp/Caddyfile.zk-candidate` a validuj:
 
    ```sh
-   docker cp /CESTA/K/Caddyfile.zk-candidate inventory-hub-caddy-1:/tmp/Caddyfile.zk-candidate
+   docker cp /tmp/Caddyfile.zk-candidate inventory-hub-caddy-1:/tmp/Caddyfile.zk-candidate
    docker exec inventory-hub-caddy-1 caddy validate --config /tmp/Caddyfile.zk-candidate --adapter caddyfile
    ```
 
 6. Po úspešnej validácii zapíš kandidáta do pôvodného hostiteľského súboru. Pri bind-mounte jednotlivého súboru zachovaj inode zápisom do existujúceho súboru, aby kontajner neostal pripojený k starej verzii. Reload:
 
    ```sh
+   cat /tmp/Caddyfile.zk-candidate > "$zk_caddy_source"
    docker exec inventory-hub-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
    ```
 
-7. V prvom režime over prihlásenie priamo na `https://hub.biketrek.sk/zk` aj nezmenený Hub/SPS. Verejná proxy nižšie je potrebná **až pri neskoršom presune**. Pri probléme obnov zálohovaný Caddyfile, validuj a reloadni. Ostatné kontajnery neodstraňuj.
+7. V prvom režime over prihlásenie vytvoreným účtom priamo na `https://hub.biketrek.sk/zk` aj nezmenený Hub/SPS. Ďalšiu doménu ani proxy pre prvé nasadenie netreba. Pri probléme obnov obsah zálohy príkazom `cat "$zk_caddy_backup" > "$zk_caddy_source"`, validuj aktuálny `/etc/caddy/Caddyfile` v kontajneri a reloadni Caddy. Premenné zálohy a zdroja sú z druhého kroku v tej istej SSH relácii. Ostatné kontajnery neodstraňuj.
 
-Nespúšťaj `docker compose down` v adresári Hubu ani reštart všetkých kontajnerov. Vygenerovaný fragment nastaví upstream `Host` a `X-Forwarded-Host` podľa vybraného `APP_URL` (`hub.biketrek.sk` alebo `zimnykurz.sk`), protokol na HTTPS a ponechá pôvodný browser `Origin`. Auth nesmie dôverovať podvrhnutej identite v hlavičkách.
+Nespúšťaj `docker compose down` v adresári Hubu ani reštart všetkých kontajnerov. Vygenerovaná konfigurácia nastaví upstream `Host` a `X-Forwarded-Host` podľa vybraného `APP_URL`, protokol na HTTPS a ponechá pôvodný browser `Origin`. Auth nesmie dôverovať podvrhnutej identite v hlavičkách.
 
-## Neskorší presun bez straty databázy
+## Preferovaný presun: priprava.zimnykurz.sk
+
+Tento presun sa vykoná až s prístupom k DNS a autorizáciou zmeny. Nevyžaduje zmenu pôvodného webu, jeho menu, repozitára `jurajk/zkweb` ani apex DNS záznamov `zimnykurz.sk`/`www`. Aktuálne sa pripravuje iba kód a postup, DNS ani živý Caddy sa automaticky nemenia.
+
+1. V DNS zóne `zimnykurz.sk` vytvor **iba nový názov `priprava`**: záznam A na skutočnú verejnú IPv4 Hub servera, prípadne aj AAAA iba ak Hub na danej IPv6 naozaj prijíma 80/443. Alternatívou je CNAME `priprava` → `hub.biketrek.sk`, ak tento názov smeruje priamo na zamýšľaný Caddy. Na rovnakom názve nekombinuj CNAME a A/AAAA. Pri DNS poskytovateľovi s proxy použi pre prvé overenie režim iba DNS. Konkrétna IP sa preberá zo skutočného servera/DNS, nevymýšľa sa. Over verejné rozlíšenie a dostupnosť 80/443; existujúci Caddy následne vybaví certifikát pre nový názov.
+2. Dohodni krátke okno na prepnutie, zálohuj databázu a aktuálny Caddyfile. Zachovaj súčasný commit a ZK blok pre návrat:
+
+   ```sh
+   cd /opt/cestou-zimy
+   docker compose --env-file zk.env -p cestou-zimy exec -T zk-app node scripts/backup.mjs
+   git rev-parse HEAD
+   ```
+
+3. V `zk.env` zmeň iba `APP_URL=https://priprava.zimnykurz.sk`. Zachovaj `BETTER_AUTH_SECRET`, `COURSE_ID`, ostatné nastavenia, Compose project name aj databázový volume. Zostav nový image a vygeneruj nový site:
+
+   ```sh
+   docker compose --env-file zk.env -p cestou-zimy build
+   docker compose --env-file zk.env -p cestou-zimy run --rm --no-deps zk-app node scripts/render-caddy.mjs > deploy/Caddyfile.zk.rendered
+   ```
+
+4. Zo skutočného aktuálneho Caddyfile vytvor zálohu a kandidáta ako v krokoch 1–2 Hub postupu. Do kandidáta pridaj celý vygenerovaný `priprava.zimnykurz.sk { ... }` **ako samostatný top-level site vedľa existujúcich site blokov**. Vnútri existujúceho `hub.biketrek.sk` **nahraď iba pôvodný ZK matcher/handle blok** obsahom `deploy/Caddyfile.zk.redirect`. Ten presmeruje `/zk` a `/zk/*` na nový koreň, zachová zvyšok cesty a query. Nepridávaj druhý ZK handler a zachovaj všetky Hub/SPS routes. Takto appka nebude bežať pod dvoma kanonickými adresami.
+5. Skopíruj kandidáta do Caddy kontajnera a validuj podľa krokov 5–6 Hub postupu. Po úspešnej validácii spusti len nový ZK kontajner a bezprostredne načítaj kandidáta do existujúceho Caddyfile so zachovaním inode:
+
+   ```sh
+   docker compose --env-file zk.env -p cestou-zimy up -d --no-deps zk-app
+   cat /tmp/Caddyfile.zk-candidate > "$zk_caddy_source"
+   docker exec inventory-hub-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+   Premenná `zk_caddy_source` pochádza z overeného mountu v tej istej SSH relácii. Počas krátkeho prepnutia stará stránka nemusí fungovať; otvor novú adresu. Samotné `caddy validate` ešte nepotvrdzuje úspešné vydanie verejného TLS certifikátu.
+6. Over `https://priprava.zimnykurz.sk/`: TLS, prihlásenie pôvodným účtom, záznam aktivity, reload, API, manifest a service worker s koreňovým scope `/`. Cookie je host-only s `Path=/`; neposiela sa na hlavný web. Staré `https://hub.biketrek.sk/zk` musí presmerovať a Hub/SPS musia fungovať ďalej. Účty, heslá, členstvo aj aktivity zostávajú v rovnakom volume. Na novej doméne sa účastník znovu prihlási a vedome povolí push; starú PWA nahradí novou.
+
+Pre návrat zmeň `APP_URL` späť na `https://hub.biketrek.sk/zk`, rebuildni a reštartuj iba ZK a obnov predchádzajúci overený Caddyfile cez kandidáta a validáciu. Samotný presun ani návrat neobnovuje databázu zo zálohy a nikdy nepoužíva `down -v` ani nové meno Compose projektu. DNS nového názvu možno ponechať do vyriešenia problému; hlavný web sa nemení.
+
+## Alternatívny presun: zimnykurz.sk/priprava bez straty databázy
 
 Po overení dostupnosti verejnej proxy postupuj takto:
 
@@ -154,14 +239,14 @@ Po overení dostupnosti verejnej proxy postupuj takto:
    ```
 
 5. Vo skutočnom Hub Caddyfile **nahraď len existujúci ZK matcher/handle blok** novým fragmentom. Ostatné routes zachovaj. Použi postup kandidát → validácia → reload vyššie; nepridávaj duplicitný blok.
-6. Aktivuj pripravenú proxy na hostingu zimnykurz.sk. Over prihlásenie, zápis, reload, komentár, oznámenia, manifest a service worker na `https://zimnykurz.sk/priprava`. Počítaj s opätovným loginom účastníkov a novým vedomým zapnutím push.
+6. Aktivuj pripravenú proxy na hostingu zimnykurz.sk. Over prihlásenie, zápis, reload, komentár, oznámenia, manifest a service worker na `https://zimnykurz.sk/priprava`. Počítaj s opätovným prihlásením účastníkov zvoleným spôsobom a novým vedomým zapnutím push. Používateľské mená a heslá zostanú zachované; heslový režim nevyžaduje SMTP ani po presune.
 7. Skontroluj, že pôvodné členstvo, aktivity, komentáre a odmeny ostali. Zmena URL nemení SQLite volume `cestou-zimy_zk_data`. **Nikdy nepoužívaj `down -v`, `docker volume rm` ani nový Compose project name** ako súčasť presunu.
 
 Ak hostingový krok zlyhá, zmeň `APP_URL` späť na `https://hub.biketrek.sk/zk`, zopakuj rebuild/reštart iba ZK, vygeneruj a obnov Hub režim jeho Caddy fragmentu. Pri samotnej zmene URL sa databáza neobnovuje zo zálohy, pretože by sa zbytočne stratili nové záznamy. Záloha slúži pre skutočné poškodenie dát alebo nekompatibilnú migráciu.
 
-## Neskorší presun: verejná proxy na hostingu zimnykurz.sk
+## Alternatíva /priprava: verejná proxy na hostingu zimnykurz.sk
 
-Túto časť netreba pre prvé nasadenie na Hube. Prístup a podpora proxy na hostingu zimnykurz.sk sú zatiaľ neoverené. Iframe ani HTTP redirect na Hub nenahrádzajú serverovú reverse proxy. Zisti od správcu hostingu, či používa nginx, Apache alebo inú reverznú proxy a či smie nakonfigurovať backendové HTTPS spojenie. Potrebujeme aj **skutočné odchádzajúce IP adresy proxy** kvôli bezpečnému určeniu IP pre limity loginu.
+Túto časť netreba pre prvé nasadenie na Hube ani pre preferovanú subdoménu. GitHub Pages zo skontrolovaného webového repozitára tieto proxy konfigurácie nespustí; alternatíva potrebuje samostatnú verejnú reverznú proxy pred pôvodným webom alebo zmenu hostingu. Táto infraštruktúra nie je potvrdená ani týmto postupom autorizovaná. Iframe ani HTTP redirect na Hub nenahrádzajú serverovú reverse proxy. Ak sa táto alternatíva neskôr zvolí, správca musí potvrdiť nginx, Apache alebo inú proxy aj možnosť backendového HTTPS spojenia. Potrebujeme tiež **skutočné odchádzajúce IP adresy proxy** kvôli bezpečnému určeniu IP pre limity loginu.
 
 - **nginx:** `deploy/zimnykurz-nginx.conf` patrí do existujúceho HTTPS `server` bloku `zimnykurz.sk`. Samostatný exact matcher presmeruje `/priprava` na `/priprava/`; prefixová location prenáša zvyšok cesty na `/zk/`. Obe trailing slash v `proxy_pass` sú zámerné. Pred reloadom musí na hostingu prejsť `nginx -t`.
 - **Apache:** `deploy/zimnykurz-apache.conf` patrí do existujúceho TLS VirtualHost, s `mod_proxy`, `mod_proxy_http`, `mod_ssl`, `mod_headers` a `mod_alias`. Nie je to bežná `.htaccess` konfigurácia. Hosting musí povoliť proxy moduly; over `apachectl configtest` pred reloadom. Fragment zachováva pôvodný web mimo `/priprava`.
@@ -173,7 +258,7 @@ Verejný hosting nesmie cachovať `/priprava/api/*`, auth odpovede ani personali
 
 ### Skutočná IP a limity prihlásenia
 
-Default je bezpečný: Caddy vloží `X-Real-IP {client_ip}`, pričom bez explicitne dôveryhodných proxy adries `{client_ip}` znamená socket peer. Pri vzdialenom hostingu je to IP jeho gateway, takže viacerí účastníci môžu zdieľať IP limit OTP. Napríklad pri limite 3 pokusov/minútu môže jeden človek dočasne blokovať druhého. Pred skupinovým používaním treba overiť limity aj reálne odovzdávanie IP; samotná funkčná stránka nestačí.
+Default je bezpečný: Caddy vloží `X-Real-IP {client_ip}`, pričom bez explicitne dôveryhodných proxy adries `{client_ip}` znamená socket peer. Pri vzdialenom hostingu je to IP jeho gateway, takže viacerí účastníci môžu zdieľať limity prihlasovania. V e-mailovom režime sa napríklad pri limite 3 žiadostí o OTP za minútu môže jeden človek dočasne dotknúť limitu druhého. Pred skupinovým používaním treba overiť limity aj reálne odovzdávanie IP; samotná funkčná stránka nestačí.
 
 Až po získaní presných IP/CIDR verejného proxy a overení, že proxy prepisuje používateľský `X-Forwarded-For`, doplň do **existujúcich** globálnych Caddy server options:
 
@@ -231,12 +316,12 @@ Obnova najprv skontroluje integritu a tabuľku `courses`, zachová predchádzaj�
 
 ## Čo overiť pred pozvaním účastníkov
 
-- Pri prvom nasadení celý tok `hub.biketrek.sk/zk` → `zk-app:3000/zk`, vrátane POST, query, reloadu deep linku a návratu po prihlásení. Neskôr osobitne aj reťazec `zimnykurz.sk/priprava` → `hub.biketrek.sk/zk` → `zk-app:3000/priprava`.
-- Aktívne `APP_URL` sa zhoduje s buildom aj Caddy fragmentom; platné TLS, správny Host/Origin, Secure/HttpOnly cookie a service worker scope používajú aktívny prefix `/zk` alebo `/priprava`.
+- Pri prvom nasadení celý tok `hub.biketrek.sk/zk` → `zk-app:3000/zk`, vrátane POST, query, reloadu deep linku a návratu po prihlásení. Po preferovanom presune `priprava.zimnykurz.sk/` → `zk-app:3000/` a presmerovanie starého `/zk`. Iba pri alternatíve osobitne aj reťazec `zimnykurz.sk/priprava` → `hub.biketrek.sk/zk` → `zk-app:3000/priprava`.
+- Aktívne `APP_URL` sa zhoduje s buildom aj Caddy konfiguráciou; platné TLS, správny Host/Origin, Secure/HttpOnly cookie a service worker scope používajú aktívny prefix `/zk`, `/priprava` alebo koreň `/` na samostatnej subdoméne.
 - Login limity pre dvoch účastníkov, aj po podvrhnutí klientského `X-Forwarded-For` (nesmie obísť limit); pri budúcej verejnej proxy osobitne overené jej IP forwarding pravidlá.
-- Prvý admin sa prihlási cez svoju schránku; nepozvaný človek nevidí kurz; odobratý člen stratí prístup aj so starou session.
+- Prvý admin sa prihlási účtom vytvoreným cez serverové CLI. Verejná registrácia bez pozvánky čaká na schválenie, platná pozvánka aktivuje iba účastníka a odobratý člen stratí prístup aj so starou session. Prístup organizátora sa neprideľuje registráciou.
 - Testovací ročník je označený, termíny prípravy sú nastavené pre skutočný kurz a demo dáta sa nezmiešajú s účastníkmi.
-- Reálny SMTP login, pozvánka, opätovné odoslanie a expirácia. Vývojová schránka nie je dôkaz doručenia e-mailu.
+- Heslové prihlásenie, zotrvanie session po zatvorení/otvorení na PC aj mobile, platnosť a počet použití pozvánok aj jednorazová obnova hesla vrátane zrušenia starých session. Pri voliteľnom e-mailovom režime navyše reálny SMTP login, pozvánka, opätovné odoslanie a expirácia; vývojová schránka nie je dôkaz doručenia e-mailu.
 - Reálny web push na cieľovom Android/iPhone, odmietnutie, odhlásenie a otvorenie správnej správy. Na iPhone/iPade môže byť potrebná inštalácia na plochu a podporovaná verzia systému.
 - Reštart kontajnera ponechá aktivity, reakcie, komentáre a oznámenia. Over zálohu/obnovu.
 - Hub a SPS ostali dostupné. Ich úspech sa nesmie odvodzovať iba zo stavu nového ZK kontajnera.

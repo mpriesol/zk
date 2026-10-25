@@ -22,7 +22,7 @@ import {
   Mountain,
   ArrowUpRight,
 } from "lucide-react";
-import type { Activity, AppState, Message, Identity } from "../lib/types";
+import type { Activity, AppState, Message } from "../lib/types";
 import { summarize } from "../lib/gamification";
 import { Avatar, Empty, Gem, Modal, fmt, monday, add } from "../components/ui";
 import ActivityForm from "../components/ActivityForm";
@@ -35,6 +35,13 @@ import AdminPanel from "../components/AdminPanel";
 import PushSettings, { disconnectPush } from "../components/PushSettings";
 import Squirrel from "../components/Squirrel";
 import Login from "../components/Login";
+import PasswordSettings from "../components/PasswordSettings";
+import {
+  authLinkToken,
+  authRequest,
+  clearAuthLink,
+  type AccountInfo,
+} from "../components/auth-api";
 export const dynamic = "force-dynamic";
 const navigation = [
   { id: "home", name: "Domov", icon: Home },
@@ -46,7 +53,7 @@ const titles: Record<string, string> = {
   home: "Tvoja cesta sa začína dnes.",
   group: "Spolu sa ide ľahšie.",
   challenges: "Malé kroky. Veľké zážitky.",
-  me: "Tvoj vlastný rytmus.",
+  me: "Tvoja príprava.",
   messages: "Správy z nášho tábora.",
   admin: "Zázemie organizátorov.",
 };
@@ -55,7 +62,9 @@ export default function Page() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [access, setAccess] = useState<number | null>(null),
-    [identity, setIdentity] = useState<Identity | null>(null),
+    [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null),
+    [recovery, setRecovery] = useState(() => !!authLinkToken("reset")),
+    [authLinkVersion, setAuthLinkVersion] = useState(0),
     [view, setView] = useState("home"),
     [form, setForm] = useState<Activity | "new" | null>(null),
     [participantView, setParticipantView] = useState(false),
@@ -63,6 +72,7 @@ export default function Page() {
     [selectedDay, setSelectedDay] = useState<string | null>(null),
     [openedMessage, setOpenedMessage] = useState<string | null>(null);
   const account = useRef<string | null>(null);
+  const attemptedInvite = useRef<string | null>(null);
   const navigate = useCallback((next: string) => {
     setView(next);
     setSelectedDay(null);
@@ -78,7 +88,58 @@ export default function Page() {
     });
   }, []);
   const refresh = useCallback(async () => {
-    const response = await fetch(appPath("/api/state"), { cache: "no-store" });
+    const accountResponse = await fetch(appPath("/api/account"), {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (accountResponse.status === 401) {
+      setState(null);
+      setAccountInfo(null);
+      setForm(null);
+      setSelectedDay(null);
+      account.current = null;
+      setAccess(401);
+      setError("");
+      return;
+    }
+    if (!accountResponse.ok)
+      throw new Error(
+        "Prihlásenie sa nepodarilo overiť. Skús obnoviť stránku.",
+      );
+    let info = (await accountResponse.json()) as AccountInfo;
+    let inviteError = "";
+    const token = authLinkToken("invite");
+    if (
+      token &&
+      attemptedInvite.current !== token &&
+      ["pending", "none"].includes(info.membership)
+    ) {
+      attemptedInvite.current = token;
+      try {
+        await authRequest("/api/invites/accept", { inviteToken: token });
+        info = { ...info, membership: "active" };
+        clearAuthLink("invite");
+      } catch (error) {
+        inviteError =
+          error instanceof Error
+            ? error.message
+            : "Pozvánku sa nepodarilo použiť.";
+      }
+    } else if (token && info.membership === "active") clearAuthLink("invite");
+    setAccountInfo(info);
+    if (info.membership === "pending" || info.membership === "revoked") {
+      setState(null);
+      setForm(null);
+      setSelectedDay(null);
+      account.current = null;
+      setAccess(403);
+      setError(inviteError);
+      return;
+    }
+    const response = await fetch(appPath("/api/state"), {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
     const body = (await response.json()) as any;
     if (!response.ok) {
       if ([401, 403, 409].includes(response.status)) {
@@ -86,7 +147,7 @@ export default function Page() {
         setForm(null);
         setSelectedDay(null);
         account.current = null;
-        if (response.status === 401) setIdentity(null);
+        if (response.status === 401) setAccountInfo(null);
         setAccess(response.status);
         setError(body.error || "Prístup do kurzu zatiaľ nie je aktivovaný.");
         return;
@@ -100,6 +161,7 @@ export default function Page() {
       setParticipantView(false);
     }
     account.current = body.me.id;
+    setAccountInfo({ ...info, membership: "active" });
     setState(body);
     setAccess(null);
     setError("");
@@ -113,12 +175,7 @@ export default function Page() {
       const next = u.searchParams.get("view");
       if (next && titles[next]) setView(next);
     }
-    Promise.all([
-      refresh(),
-      fetch(appPath("/api/identity"), { cache: "no-store" })
-        .then((r) => r.json())
-        .then((d: any) => setIdentity(d.identity)),
-    ])
+    refresh()
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
     const resume = () => {
@@ -133,15 +190,23 @@ export default function Page() {
         setState(null);
         setForm(null);
         setSelectedDay(null);
-        setIdentity(null);
+        setAccountInfo(null);
         setAccess(401);
         void refresh().catch(() => {});
       }
     };
+    const authLinkChange = () => {
+      setRecovery(!!authLinkToken("reset"));
+      setAuthLinkVersion((version) => version + 1);
+      attemptedInvite.current = null;
+      void refresh().catch((error) => setError(error.message));
+    };
+    window.addEventListener("hashchange", authLinkChange);
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("pageshow", pageShow);
     window.addEventListener("storage", sessionChange);
     return () => {
+      window.removeEventListener("hashchange", authLinkChange);
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("pageshow", pageShow);
       window.removeEventListener("storage", sessionChange);
@@ -168,7 +233,7 @@ export default function Page() {
         setForm(null);
         setSelectedDay(null);
         setAccess(response.status);
-        if (response.status === 401) setIdentity(null);
+        if (response.status === 401) setAccountInfo(null);
       }
       throw new Error(body.error || "Zmenu sa nepodarilo uložiť.");
     }
@@ -210,8 +275,10 @@ export default function Page() {
         <p className="muted">Otváram tvoj denník…</p>
       </main>
     );
-  if (!state && !identity && (!access || access === 401))
-    return <Login onSuccess={() => window.location.reload()} />;
+  if (recovery || (!state && !accountInfo && (!access || access === 401)))
+    return (
+      <Login key={authLinkVersion} onSuccess={() => window.location.reload()} />
+    );
   if (!state)
     return (
       <main className="access-screen">
@@ -221,41 +288,59 @@ export default function Page() {
             Cestou Zimy<span>PRÍPRAVA NA ZIMNÝ KURZ</span>
           </div>
           <h1>
-            {access === 403
-              ? "Tvoja pozvánka ešte čaká."
-              : access === 409
-                ? "Priestor pre váš zimný kurz."
-                : "Začnime spoločnú cestu."}
+            {accountInfo?.membership === "pending"
+              ? "Účet čaká na schválenie."
+              : accountInfo?.membership === "revoked"
+                ? "Prístup do kurzu je pozastavený."
+                : access === 403
+                  ? "Prístup do kurzu zatiaľ nie je aktívny."
+                  : access === 409
+                    ? "Priestor pre váš zimný kurz."
+                    : "Začnime spoločnú cestu."}
           </h1>
           <p>
-            {access === 403
-              ? "Do prípravy majú prístup pozvaní členovia kurzu. Organizátor musí pridať e-mail tvojho prihláseného účtu."
-              : access === 409
-                ? "Organizátor ešte dokončuje bezpečné prvé nastavenie aplikácie. Po vytvorení kurzu sa tu otvorí tvoj denník."
-                : "Tvoj denník pohybu, spoločné výzvy a správy od organizátorov. Dobrovoľne, bez porovnávania výkonov."}
+            {accountInfo?.membership === "pending"
+              ? "Účet je vytvorený a zostávaš prihlásený. Organizátor ešte potvrdí tvoj vstup do súkromnej skupiny."
+              : accountInfo?.membership === "revoked"
+                ? "Tvoje členstvo momentálne nie je aktívne. Ozvi sa organizátorovi kurzu."
+                : access === 403
+                  ? "Do prípravy majú prístup pozvaní alebo schválení členovia kurzu. Ozvi sa organizátorovi."
+                  : access === 409
+                    ? "Organizátor ešte dokončuje bezpečné prvé nastavenie aplikácie. Po vytvorení kurzu sa tu otvorí tvoj denník."
+                    : "Tvoj denník pohybu, spoločné výzvy a správy od organizátorov. Dobrovoľne, bez porovnávania výkonov."}
           </p>
           {error && (
             <p className="info-note" role="status">
               {error}
             </p>
           )}
-          {identity && (
-            <p className="small muted">Prihlásený účet: {identity.email}</p>
+          {accountInfo && (
+            <p className="small muted">
+              Prihlásený účet: {accountInfo.username || "e-mailové prihlásenie"}
+            </p>
           )}
           <div className="stack">
             <button
               className="button primary"
-              onClick={() => void refresh().catch((e) => setError(e.message))}
+              onClick={() => {
+                attemptedInvite.current = null;
+                void refresh().catch((e) => setError(e.message));
+              }}
             >
-              Obnoviť prístup <RefreshCw size={17} />
+              {accountInfo?.membership === "pending"
+                ? "Skontrolovať schválenie"
+                : "Obnoviť prístup"}{" "}
+              <RefreshCw size={17} />
             </button>
-            {identity && (
+            {accountInfo && (
               <button className="text-button centered" onClick={logout}>
                 Použiť iný účet
               </button>
             )}
           </div>
-          <p className="small muted">Súkromná skupina · vstup na pozvanie</p>
+          <p className="small muted">
+            Súkromná skupina · pozvánka alebo schválenie organizátorom
+          </p>
         </div>
         <img
           className="access-trees"
@@ -640,8 +725,8 @@ export default function Page() {
                       </>
                     ) : (
                       <p>
-                        Keď organizátori zverejnia výzvu, nájdeš ju tu. Dovtedy
-                        môžeš objavovať vlastný rytmus.
+                        Keď organizátori zverejnia výzvu, nájdeš ju tu. Zatiaľ
+                        si môžeš zapisovať svoj pohyb.
                       </p>
                     )}
                     <button
@@ -680,6 +765,7 @@ export default function Page() {
           {activeView === "me" && (
             <>
               <Profile state={state} action={action} onLogout={logout} />
+              <PasswordSettings account={accountInfo} onChanged={refresh} />
               <Stats
                 startDate={state.course.startDate}
                 activities={own}
@@ -720,7 +806,11 @@ export default function Page() {
             />
           )}
           {activeView === "admin" && isAdmin && (
-            <AdminPanel state={state} onAction={action} />
+            <AdminPanel
+              state={state}
+              onAction={action}
+              onMembershipChanged={refresh}
+            />
           )}
           <footer className="page-footer">
             <span>Cestou Zimy · každý svojím tempom</span>
@@ -809,7 +899,7 @@ function Profile({
             <p className="eyebrow">TVOJ PROFIL</p>
             <h2>{state.me.nickname}</h2>
             <p className="muted small">
-              Ostatní vidia tvoju prezývku, nie e-mail.
+              Ostatní vidia tvoju prezývku. Celé meno nepotrebujeme.
             </p>
           </div>
         </div>

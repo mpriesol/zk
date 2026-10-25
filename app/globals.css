@@ -3389,3 +3389,78 @@ pre.pre-wrap {
     grid-template-columns: 1fr;
   }
 }
+
+/* Account forms remain comfortable on phones and wide desktops. */
+.auth-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  margin: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #f2f6f1;
+}
+.auth-tabs button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+.auth-tabs button.active {
+  background: var(--teal);
+  color: white;
+}
+.auth-password-input {
+  position: relative;
+  display: flex;
+}
+.auth-password-input > input {
+  padding-right: 50px;
+  min-width: 0;
+}
+.auth-password-input > button {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  color: var(--teal-dark);
+  background: transparent;
+}
+.auth-password-input > button:hover {
+  background: #eaf1eb;
+}
+.auth-alternative {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+  text-align: center;
+}
+.auth-session-note {
+  margin-top: 24px;
+}
+.auth-session-note svg {
+  vertical-align: -3px;
+  margin-right: 4px;
+}
+.password-settings {
+  margin-bottom: 25px;
+}
+.password-settings h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.password-settings > form {
+  max-width: 540px;
+  margin-top: 22px;
+}

@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { emailOTP } from "better-auth/plugins";
+import { emailOTP, username as usernamePlugin } from "better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import nodemailer from "nodemailer";
@@ -21,7 +21,24 @@ export interface Mail {
   text: string;
   messageId?: string;
 }
+export type AuthMode = "password" | "email" | "both";
+export const isInternalEmail = (email: string) =>
+  email.toLowerCase().endsWith("@accounts.cestou-zimy.invalid");
+export const displayUsername = (value: string) =>
+  value.normalize("NFKC").trim().replace(/\s+/g, " ");
+export const normalizeUsername = (value: string) =>
+  displayUsername(value).toLowerCase();
+export const validUsername = (value: string) =>
+  value.length >= 3 &&
+  value.length <= 32 &&
+  /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u.test(value);
+export const passwordEnabled = (settings: AuthSettings) =>
+  (settings.authMode ?? "email") !== "email";
+export const emailOtpEnabled = (settings: AuthSettings) =>
+  (settings.authMode ?? "email") !== "password";
 export interface AuthSettings {
+  authMode?: AuthMode;
+  registrationOpen?: boolean;
   appUrl: string;
   secret: string;
   courseId: string;
@@ -41,6 +58,9 @@ export function authSettingsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): AuthSettings {
   const production = env.NODE_ENV === "production";
+  const authMode = env.AUTH_MODE || "password";
+  if (!["password", "email", "both"].includes(authMode))
+    throw new Error("AUTH_MODE musí byť password, email alebo both.");
   const appUrl =
     env.APP_URL || `http://localhost:${env.PORT || 3000}${APP_BASE_PATH}`;
   const basePath = basePathFromUrl(appUrl),
@@ -69,11 +89,17 @@ export function authSettingsFromEnv(
     throw new Error("AUTH_MAIL_MODE musí byť smtp alebo file.");
   if (production && mailMode === "file")
     throw new Error("Vývojové ukladanie e-mailov je v produkcii zakázané.");
-  if (production && (!env.SMTP_HOST || !env.MAIL_FROM))
+  if (
+    production &&
+    authMode !== "password" &&
+    (!env.SMTP_HOST || !env.MAIL_FROM)
+  )
     throw new Error(
       "Produkčný e-mailový login vyžaduje SMTP_HOST a MAIL_FROM.",
     );
   return {
+    authMode: authMode as AuthMode,
+    registrationOpen: env.REGISTRATION_OPEN !== "false",
     appUrl: url.origin + basePath,
     secret,
     production,
@@ -101,6 +127,8 @@ export function createMailer(
     mkdirSync(settings.mailDirectory, { recursive: true, mode: 0o700 });
     chmodSync(settings.mailDirectory, 0o700);
     return async (mail) => {
+      if (isInternalEmail(mail.to))
+        throw new Error("Interný účet nemá e-mailovú schránku.");
       writeFileSync(
         join(settings.mailDirectory, `${Date.now()}-${randomUUID()}.json`),
         JSON.stringify(
@@ -128,6 +156,8 @@ export function createMailer(
       })
     : null;
   return async (mail) => {
+    if (isInternalEmail(mail.to))
+      throw new Error("Interný účet nemá e-mailovú schránku.");
     if (!smtp)
       throw new Error(
         "Prihlasovacie e-maily zatiaľ nemajú nastavený SMTP server.",
@@ -138,6 +168,13 @@ export function createMailer(
   };
 }
 
+const settingsByAuth = new WeakMap<object, AuthSettings>();
+export function getAuthSettings(auth: object): AuthSettings {
+  const settings = settingsByAuth.get(auth);
+  if (!settings) throw new Error("Chýba konfigurácia prihlasovania.");
+  return settings;
+}
+
 /** Standard Better Auth email OTP; all identity comes from its signed session cookie. */
 export function createAuth(
   db: SQLiteDatabase,
@@ -146,6 +183,7 @@ export function createAuth(
 ) {
   const basePath = basePathFromUrl(settings.appUrl);
   const eligible = (email: string) => {
+    if (!emailOtpEnabled(settings) || isInternalEmail(email)) return false;
     const member = db.native
       .prepare(
         "SELECT id FROM members WHERE course_id=? AND email=? AND active=1",
@@ -169,7 +207,35 @@ export function createAuth(
       new URL(settings.appUrl).origin,
       ...(settings.trustedOrigins || []),
     ],
-    emailAndPassword: { enabled: false },
+    emailAndPassword: {
+      enabled: passwordEnabled(settings),
+      minPasswordLength: 10,
+      maxPasswordLength: 128,
+      requireEmailVerification: false,
+    },
+    databaseHooks: {
+      account: {
+        delete: {
+          before: async (account, context) => {
+            // Email OTP deliberately removes unproven password links. The one
+            // exception is a credential provisioned locally by the trusted CLI,
+            // tied to its exact account ID and original configured mailbox.
+            // The library still verifies the OTP and revokes every old session.
+            if (
+              context?.path === "/sign-in/email-otp" &&
+              account.providerId === "credential"
+            ) {
+              const trusted = db.native
+                .prepare(
+                  'SELECT p.user_id FROM operator_password_accounts p JOIN "user" u ON u.id=p.user_id WHERE p.user_id=? AND p.account_id=? AND p.email=u.email',
+                )
+                .get(account.userId, account.id);
+              if (trusted) return false;
+            }
+          },
+        },
+      },
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
@@ -180,7 +246,7 @@ export function createAuth(
       defaultCookieAttributes: {
         httpOnly: true,
         sameSite: "lax",
-        path: basePath,
+        path: basePath || "/",
       },
       ipAddress: { ipAddressHeaders: ["x-real-ip"] },
     },
@@ -192,10 +258,36 @@ export function createAuth(
       customRules: {
         "/email-otp/send-verification-otp": { window: 60, max: 3 },
         "/sign-in/email-otp": { window: 60, max: 8 },
+        "/sign-in/username": { window: 60, max: 8 },
+        "/change-password": { window: 60, max: 5 },
       },
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (
+          ctx.path === "/sign-in/username" &&
+          typeof ctx.body?.username === "string"
+        )
+          ctx.body.username = normalizeUsername(ctx.body.username);
+        if (
+          (ctx.path.startsWith("/email-otp/") ||
+            ctx.path === "/sign-in/email-otp") &&
+          !emailOtpEnabled(settings)
+        )
+          throw new APIError("NOT_FOUND", {
+            message: "E-mailové prihlasovanie nie je zapnuté.",
+          });
+        if (
+          ["/sign-in/username", "/sign-up/email", "/change-password"].includes(
+            ctx.path,
+          ) &&
+          !passwordEnabled(settings)
+        )
+          throw new APIError("NOT_FOUND", {
+            message: "Prihlasovanie heslom nie je zapnuté.",
+          });
+        if (ctx.path === "/change-password")
+          ctx.body.revokeOtherSessions = true;
         if (
           ctx.path === "/email-otp/send-verification-otp" &&
           ctx.body?.type !== "sign-in"
@@ -216,6 +308,20 @@ export function createAuth(
       }),
     },
     plugins: [
+      usernamePlugin({
+        minUsernameLength: 3,
+        maxUsernameLength: 32,
+        usernameNormalization: normalizeUsername,
+        displayUsernameNormalization: displayUsername,
+        usernameValidator: validUsername,
+        displayUsernameValidator: (value) =>
+          validUsername(displayUsername(value)),
+        validationOrder: {
+          username: "post-normalization",
+          displayUsername: "post-normalization",
+        },
+        immutableUsername: true,
+      }),
       emailOTP({
         otpLength: 6,
         expiresIn: 600,
@@ -240,6 +346,7 @@ export function createAuth(
       }),
     ],
   });
+  settingsByAuth.set(auth, settings);
   return auth;
 }
 export async function migrateAuth(auth: ReturnType<typeof createAuth>) {

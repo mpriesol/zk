@@ -126,7 +126,9 @@ export function notificationPath(
     ? new URL(normalized).pathname.replace(/\/+$/, "")
     : APP_BASE_PATH;
   const base =
-    selected === "/zk" || selected === "/priprava" ? selected : APP_BASE_PATH;
+    selected === "" || selected === "/zk" || selected === "/priprava"
+      ? selected
+      : APP_BASE_PATH;
   return `${base}/?view=messages&message=${encodeURIComponent(messageId)}`;
 }
 export function validNotificationPath(

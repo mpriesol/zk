@@ -1,82 +1,93 @@
-# E-mailové prihlásenie a Node runtime
+# Účty, prihlasovanie a Node runtime
 
-Aplikácia na vlastnom serveri používa **Better Auth 1.7 + emailOTP**, Node.js 24 a natívny `node:sqlite`. Účastník nepotrebuje účet ChatGPT. Prihlasovanie nie je prepínač ukážkových používateľov. Server overuje podpísanú session cookie a z nej získava identitu; žiadne používateľské identifikačné hlavičky z prehliadača nepovažuje za dôveryhodné.
+Aplikácia používa Better Auth, Node.js 24 a SQLite. Predvolené prihlásenie je **používateľské meno a heslo**, bez e-mailu a bez SMTP. E-mailový jednorazový kód zostáva voliteľným spôsobom prihlásenia. Účastník nepotrebuje účet ChatGPT. Server získava identitu zo session; používateľské identifikačné hlavičky z prehliadača nepovažuje za dôveryhodné.
 
-## Správanie
+## Používateľské meno a heslo
 
-1. Organizátor pridá e-mail do konkrétneho kurzu.
-2. Používateľ si vyžiada šesťmiestny jednorazový kód. Platí 10 minút. Opätovné odoslanie vytvorí nový kód; použi posledný prijatý.
-3. Better Auth kontroluje kód, vytvorí štandardný používateľský účet a session. Pred overením kódu znovu kontrolujeme aktívne členstvo. Verejná registrácia do kurzu neexistuje.
-4. Session je uložená v SQL databáze. Cookie je `HttpOnly`, `SameSite=Lax`, má cestu podľa `APP_URL` (`Path=/zk` alebo `Path=/priprava`), v produkcii `Secure`; platnosť je 30 dní a obnovuje sa pri používaní po jednom dni. Obnovenie stránky nevyžaduje nový kód.
-5. Každé aplikačné API volanie samostatne overí aktuálne členstvo a rolu. Odobratý člen preto stratí prístup aj s platnou session.
-6. Odhlásenie revokuje serverovú session a vymaže cookie. Súkromné API odpovede používajú `Cache-Control: private, no-store`; service worker ich necachuje.
+Povinné údaje pri registrácii sú prezývka (používateľské meno) a heslo. Celé meno je voliteľné a súkromné; ostatní účastníci vidia iba prezývku. Heslo má 10 až 128 znakov. Meno má 3 až 32 znakov; povoľujú sa písmená, čísla, medzery a znaky `._-`. Pri porovnávaní sa meno normalizuje a nerozlišuje veľké a malé písmená. Heslo sa ukladá prostredníctvom Better Auth ako hash, nie ako čitateľný text; aplikácia nemá vlastný algoritmus hashovania.
 
-OTP je v databáze hashovaný štandardným mechanizmom Better Auth. Platný kód možno použiť iba raz, päť chybných pokusov ho zneplatní. Opatrenia proti opakovaným pokusom sú uložené v databáze: najviac 3 žiadosti o kód a 8 pokusov o prihlásenie z jednej IP za minútu. Neprihlásenej cudzej adrese neodošleme kód; odpoveď na žiadosť je všeobecná a neoznamuje zoznam účastníkov. Rozdiel času odosielania SMTP sa tým úplne nemaskuje.
+Registrácia nevytvára organizátora. S platnou pozvánkou sa nový účastník aktivuje; bez pozvánky čaká na schválenie organizátorom. Pozvánka má predvolene platnosť 7 dní a limit 30 použití. Organizátor môže zvoliť 1 až 30 dní a 1 až 100 použití alebo ju zrušiť. Limit jedného použitia je vhodný pre osobnú pozvánku. Schválenie členstva a roly kontroluje server pri každom aplikačnom API volaní, takže samotný vytvorený účet alebo platná session neposkytuje prístup do kurzu. Odobratý člen stratí prístup aj so starou session.
 
-Rozhranie zachová aktuálnu adresu aplikácie vrátane otvorenej správy; úspešné prihlásenie znovu načíta tú istú obrazovku. Chybové a expirované kódy nevytvárajú falošné úspešné hlásenie. Presmerovania na cudzie URL sa pri prihlasovaní nepoužívajú.
+Organizátor môže v administrácii vystaviť jednorazový odkaz na nastavenie nového hesla. Platí 20 minút, nevyžaduje SMTP a treba ho odovzdať konkrétnemu používateľovi súkromne. Úspešná zmena hesla zruší jeho doterajšie session. Organizátor pôvodné heslo nevidí a nevytvára používateľovi zdieľané univerzálne heslo.
 
-## Konfigurácia
+## Trvalé prihlásenie na PC a mobile
+
+Session je v SQL databáze a cookie má `HttpOnly`, `SameSite=Lax`, cestu podľa `APP_URL` (`/zk`, `/priprava` alebo `/` na samostatnej subdoméne) a v produkcii `Secure`. Platnosť je 30 dní; pri používaní sa obnovuje po jednom dni. Obnovenie stránky alebo bežné opätovné otvorenie prehliadača nevyžaduje nové prihlásenie. PC a mobil môžu mať samostatné session. Súkromný režim prehliadača, zmazanie cookies, odhlásenie, zmena hesla alebo uplynutie relácie si vyžiada nové prihlásenie.
+
+Odhlásenie zruší serverovú session a cookie daného zariadenia. Súkromné API odpovede majú `Cache-Control: private, no-store`; service worker ich necachuje. Po prihlásení sa zachová aktuálna adresa aplikácie vrátane otvorenej správy. Ochrana Origin a kontrola Host ostávajú zapnuté.
+
+## Prvý organizátor bez SMTP
+
+Prvý organizátor sa vytvára **iba explicitným príkazom na serveri**, nie verejnou registráciou ani rozhodnutím „prvý registrovaný je admin“. Po spustení ZK kontajnera:
+
+```sh
+cd /opt/cestou-zimy
+docker compose --env-file zk.env -p cestou-zimy exec -it zk-app node --experimental-strip-types scripts/create-admin.ts
+```
+
+Príkaz si interaktívne vypýta používateľské meno, heslo a jeho potvrdenie. Heslo sa pri písaní nezobrazuje; neprijíma sa v argumente ani premennej prostredia a nevypíše sa do výsledku. Príkaz používa Better Auth na vytvorenie účtu a vytvorí prvý kurz s členstvom organizátora. Na už existujúcom kurze alebo pri existujúcom organizátorovi sa bootstrap odmietne. Existujúce účty ani role sa týmto príkazom neprepisujú.
+
+Pre lokálny vývoj použi rovnaký skript s `node --env-file=.env --experimental-strip-types scripts/create-admin.ts`. Neinteraktívny vstup je povolený iba izolovaným automatickým testom s `NODE_ENV=test`; prevádzkovateľ používa terminál. Ak pri vytváraní prvého organizátora nastavíš `BOOTSTRAP_ADMIN_EMAIL`, jeho heslový účet dostane aj túto súkromnú adresu pre neskoršie voliteľné e-mailové prihlásenie. Bez nej sa prvý admin vytvorí bez požiadavky na e-mail. Samotné nastavenie adresy pri CLI nie je skúškou SMTP doručenia. Po prvom prihlásení nastav názov a dátumy kurzu a vytvor pozvánky alebo schváľ čakajúcich členov. Pri rušení rolí server chráni posledného aktívneho organizátora.
+
+## Konfigurácia spôsobu prihlásenia
 
 | Premenná | Význam |
 |---|---|
+| `AUTH_MODE` | `password` (predvolené): meno a heslo; `email`: iba e-mailový OTP; `both`: obe možnosti |
 | `NODE_ENV` | Na vlastnom serveri `production` |
-| `APP_URL` | Najprv `https://hub.biketrek.sk/zk`, neskôr `https://zimnykurz.sk/priprava`; rovnaká hodnota pre build aj runtime |
-| `BETTER_AUTH_SECRET` | Náhodné tajomstvo, aspoň 32 znakov; nesmie byť v Gite |
-| `DATABASE_PATH` | Cesta k SQLite súboru, v kontajneri napr. `/data/cestou-zimy.sqlite` |
-| `COURSE_ID` | Samostatný identifikátor ročníka, predvolene `cestou-zimy` |
-| `BOOTSTRAP_ADMIN_EMAIL` | E-mail prvého organizátora |
-| `AUTH_MAIL_MODE` | `smtp` v produkcii; `file` je dostupné výhradne vo vývoji |
-| `SMTP_HOST`, `SMTP_PORT` | Existujúci SMTP poskytovateľ, port predvolene 587 |
-| `SMTP_SECURE` | `true` pre implicitné TLS, obvykle port 465; inak sa vyžaduje STARTTLS |
-| `SMTP_USER`, `SMTP_PASSWORD` | Prihlásenie SMTP; pri vlastnom dôveryhodnom relayi môžu byť prázdne |
-| `MAIL_FROM` | Overená odosielacia adresa, napr. `Cestou Zimy <info@example.sk>` |
-| `HOST`, `PORT` | Predvolene `127.0.0.1:3000`; kontajner používa `0.0.0.0:3000` |
-| `TRUST_PROXY` | `1` len ak aplikáciu možno dosiahnuť výhradne cez dôveryhodný Caddy, ktorý prepisuje `X-Real-IP` |
-| `AUTH_TRUSTED_ORIGINS` | Voliteľné presné ďalšie dôveryhodné originy oddelené čiarkou; bežne nepoužívať |
-| `MAIL_DIRECTORY` | Len vývoj: súkromný adresár súborových e-mailov, predvolene `.data/mail` |
+| `APP_URL` | Najprv `https://hub.biketrek.sk/zk`, neskôr prednostne `https://priprava.zimnykurz.sk`; podporované aj `https://zimnykurz.sk/priprava`; rovnaká hodnota pre build aj runtime |
+| `BETTER_AUTH_SECRET` | Náhodné tajomstvo aspoň 32 znakov; nepatrí do Git a nemá sa meniť pri reštarte |
+| `DATABASE_PATH` | SQLite súbor; v Docker volume `/data/cestou-zimy.sqlite` |
+| `COURSE_ID` | Identifikátor ročníka; predvolene `cestou-zimy`; pri aktualizácii zachovať |
+| `BOOTSTRAP_ADMIN_EMAIL` | Voliteľná súkromná adresa prvého organizátora vytvoreného cez CLI; zároveň bootstrap adresa v e-mailovom režime. Bežná heslová registrácia ju nepoužíva. |
+| `REGISTRATION_OPEN` | Predvolene otvorené; hodnota `false` zastaví vytváranie nových heslových účtov aj cez pozvánku, existujúce účty sa môžu prihlasovať |
+| `AUTH_MAIL_MODE` | `smtp` pre produkčné e-maily; `file` iba vo vývoji |
+| `SMTP_HOST`, `SMTP_PORT` | Existujúci SMTP poskytovateľ; port predvolene 587 |
+| `SMTP_SECURE` | `true` pre implicitné TLS (obvykle 465); inak sa vyžaduje STARTTLS |
+| `SMTP_USER`, `SMTP_PASSWORD` | SMTP prihlasovanie; prázdne iba pri zámerne nakonfigurovanom dôveryhodnom relayi |
+| `MAIL_FROM` | Povolená odosielacia adresa, napr. `Cestou Zimy <info@example.sk>` |
+| `HOST`, `PORT` | Kontajner používa `0.0.0.0:3000` bez verejne publikovaného portu |
+| `TRUST_PROXY` | `1` iba za dôveryhodným Caddy, ktorý prepisuje `X-Real-IP` |
+| `AUTH_TRUSTED_ORIGINS` | Voliteľné presné ďalšie dôveryhodné originy; bežne nepoužívať |
+| `MAIL_DIRECTORY` | Len vývoj: súkromný súborový mailbox, predvolene `.data/mail` |
 
-Tajomstvo vytvor napríklad `openssl rand -base64 48` a vlož ho priamo do nezverejňovanej konfigurácie. Server v produkcii odmietne spustenie bez tajomstva, HTTPS adresy, SMTP servera alebo odosielateľa. Vývojový súborový mailbox sa v produkcii nedá zapnúť.
+Produkčný štart vyžaduje HTTPS adresu a tajomstvo. `AUTH_MODE=password` nepotrebuje SMTP. Režimy `email` a `both` v produkcii vyžadujú SMTP server aj povolený `MAIL_FROM`; vývojový súborový mailbox nie je produkčnou náhradou. Pre e-maily je možné použiť existujúceho SMTP poskytovateľa; inštalácia samostatného mailového servera na Hube nie je podmienkou aplikácie.
 
-## Prvý organizátor
+Po zmene `AUTH_MODE` alebo SMTP údajov v `zk.env` obnov iba ZK kontajner. Pri rovnakej URL netreba rebuild:
 
-Pri štarte sa vykonajú schémové migrácie, ale nevytvára sa verejne použiteľný admin účet ani heslo. E-mail v `BOOTSTRAP_ADMIN_EMAIL` si vyžiada a overí skutočný OTP kód. Jeho prvé načítanie aplikačného `api/state` (najprv `/zk/api/state`) vytvorí testovací ročník a člena s rolou organizátora, **iba ak kurz ešte neexistuje**. Zhodu e-mailu overuje server. Potom organizátor upraví názov a dátumy a pozve ďalších členov. Po vytvorení môže prevádzkovateľ premennú odstrániť; existujúca rola sa zachová v databáze.
+```sh
+docker compose --env-file zk.env -p cestou-zimy up -d --no-deps --force-recreate zk-app
+```
 
-Zmena bootstrap e-mailu na existujúcom kurze nepridá ďalšieho admina. Roly ďalších členov spravuje už oprávnený organizátor. Odstránenie posledného aktívneho organizátora aplikačné API odmietne.
+Samotný `restart` nové hodnoty z `zk.env` nenačíta. Zmena spôsobu prihlásenia nie je nástrojom na pridelenie ďalších rolí ani na zmazanie kurzu.
 
-## Migrácie a proces
+## Voliteľné e-mailové prihlásenie
 
-`server/sqlite.ts` poskytuje `SQLiteDatabase` pre rovnaký backend ako integračné testy. Používa WAL a atomické databázové dávky. `migrateApp` aplikuje SQL migrácie z `drizzle` v poradí a uloží ich kontrolné súčty do `__app_migrations`; už aplikovanú migráciu nemožno potichu prepísať. Schéma Better Auth sa pripravuje jeho oficiálnym `getMigrations(...).runMigrations()`.
+V režime `email` alebo `both` organizátor pridá e-mail do kurzu. Účastník si vyžiada šesťmiestny kód, ktorý platí 10 minút. Opätovné odoslanie vytvorí nový kód; platí najnovší. Better Auth kontroluje kód, vytvorí účet a session; server pred overením znovu kontroluje členstvo. OTP je v databáze hashovaný. Platný kód možno použiť raz a päť chybných pokusov ho zneplatní. Limity žiadostí o kód a prihlásení sa uchovávajú v databáze. Odpoveď na žiadosť neprezrádza členstvo cudzej adresy.
 
-`node --experimental-strip-types scripts/migrate.ts` vykoná iba migrácie. `server/start.ts` ich vykoná automaticky pred prijímaním požiadaviek. Na úplne prázdnej databáze môže Better Auth pri prvej inicializácii krátko vypísať chýbajúcu schému; nasledujúca migrácia ju vytvorí pred otvorením HTTP portu. Pri chybe migrácie sa server nespustí.
+Pri prvotnom e-mailovom bootstrape sa použije `BOOTSTRAP_ADMIN_EMAIL`: oprávnený účet musí overiť OTP zo skutočnej schránky a kurz ešte nesmie existovať. Zmena tejto premennej na existujúcom kurze nepridáva nového organizátora. Po vytvorení admina ju možno odstrániť. SMTP prijatie správy nie je potvrdenie prečítania ani garantovaného doručenia. Reálne doručenie a správnu konfiguráciu odosielateľa treba overiť samostatne.
 
-Produkčný runtime servíruje `dist/client`, API a štandardné auth endpointy pod cestou z `APP_URL`. Spočiatku prihlasovanie používa `/zk/api/auth`, aplikačné API `/zk/api/state` a `/zk/api/action`; po zmene konfigurácie sa všetko presunie pod `/priprava`. Hodnotu `APP_BASE_PATH` odvodzuje `lib/paths.ts` z rovnakej konfigurácie. Frontend dostane verejnú cestu pri zostavení cez `__CZ_BASE_PATH__`; nejde o ďalšiu samostatnú premennú prevádzkovateľa. Produkčný štart porovná `dist/client/build-config.json` s cestou servera a pri nesúlade odmietne spustenie. Manifest sa vždy generuje pre aktívnu cestu. Nezávislý interval každých 30 sekúnd spracúva trvalú frontu oznámení a pozvánok; zavretý adminov prehliadač spracovanie nezastaví. SMTP prijatie správy nie je potvrdenie prečítania ani garantovaného doručenia. Záznamy z fronty majú obmedzené opakovanie; pozvánky používajú stabilné `Message-ID`, no SMTP samotné neposkytuje presne-jednorazové doručenie pri havárii tesne po prijatí.
+## Migrácie a runtime
 
-`GET /healthz` overí dostupnosť databázy bez účtu a vracia iba `{"ok":true}`. Pri vývoji sa používa React/Vite middleware. Pomocná `/__qa?width=390&height=844` (iframe smeruje na aktívnu cestu aplikácie) je dostupná iba mimo produkcie a zobrazuje aplikáciu v presnom rozmere na kontrolu responzívnosti; nejde o emuláciu Safari.
+`server/sqlite.ts` používa WAL a atómové databázové dávky. `migrateApp` aplikuje verzované SQL migrácie z `drizzle` a uchováva ich kontrolné súčty; už aplikovaná migrácia sa nesmie spätne prepisovať. Better Auth pripravuje schému cez podporované migračné rozhranie. `server/start.ts` aplikuje migrácie pred prijímaním požiadaviek. Pri chybe migrácie sa server nespustí.
 
-## Dve etapy nasadenia a presun bez zmeny kódu
+Produkčný runtime servíruje `dist/client`, API a auth endpointy pod cestou z `APP_URL`. Pred prijatím požiadaviek porovná prefix buildu s prefixom servera; nesúlad odmietne. Manifest a service worker používajú aktívnu cestu. `GET /healthz` kontroluje dostupnosť databázy bez používateľského účtu a vracia iba `{"ok":true}`. Nezávislý interval spracúva trvalú notifikačnú frontu, takže zavretie adminovho prehliadača spracovanie nezastaví.
 
-**Prvá etapa:** `APP_URL=https://hub.biketrek.sk/zk`. Prehliadač navštevuje Hub a Caddy zachová `/zk` aj `Host: hub.biketrek.sk`. Cookie má `Path=/zk`. Ide o skutočnú aplikáciu s rovnakou databázou a oprávneniami, nie o samostatný demo frontend.
+Vývojová `/__qa` a izolovaný vizuálny test nie sú dostupným prihlasovacím mechanizmom. Fiktívne účty sa nezmiešavajú s produkčným ročníkom. Vývojový `AUTH_MAIL_MODE=file` ukladá skúšobné e-maily v súkromnom adresári (0700, súbory 0600); neoveruje doručenie do skutočnej schránky.
 
-**Neskorší presun:** nastav `APP_URL=https://zimnykurz.sk/priprava`, znovu zostav frontend/kontajner s touto hodnotou a spusti ho s rovnakou hodnotou. Zachovaj databázový volume, `DATABASE_PATH`, `COURSE_ID` a `BETTER_AUTH_SECRET`. Vygeneruj príslušný variant Caddy konfigurácie podľa dokumentácie nasadenia. Kód sa neupravuje a existujúce aktivity, členovia, odmeny a správy zostávajú v databáze.
+## Presun z Hubu na zimnykurz.sk
 
-V druhej etape musí hosting pôvodného webu proxyovať `/priprava/` na `https://hub.biketrek.sk/zk/`. Caddy v tomto variante prepíše `/zk` na `/priprava` a backendu nastaví kanonický `Host: zimnykurz.sk`. Dostupnosť reverznej proxy na hostingu zimnykurz.sk treba overiť pred presunom. Origin pri POST ostáva skutočný verejný origin; ochrana CSRF a kontrola Host sa nevypínajú. Súčasne sa nepovoľujú dva verejné originy ako obchádzka.
+Začni s `APP_URL=https://hub.biketrek.sk/zk`. Pri neskoršom presune nastav `https://priprava.zimnykurz.sk`, zostav nový image a pridaj samostatný Caddy site blok pre subdoménu smerujúcu DNS na Hub. Hlavný web ani jeho menu sa nemenia. Alternatíva `https://zimnykurz.sk/priprava` zostáva podporovaná, ale potrebuje verejnú reverse proxy pred pôvodným webom. Zachovaj SQLite volume, `COURSE_ID` a `BETTER_AUTH_SECRET`. Účty, heslá, členstvá, aktivity, odmeny a správy zostanú. Heslový režim funguje na všetkých troch adresách a nevyžaduje pridanie SMTP.
 
-Po zmene domény sa účastník znova prihlási OTP kódom. Prehliadač správne neprenesie cookies z Hubu na zimnykurz.sk. Push odbery sú tiež viazané na origin, preto treba na novej adrese upozornenia opätovne zapnúť a prípadne nahradiť starú ikonu PWA. Zmena `APP_URL` neprepisuje databázu. `appPath` vie zjednotiť uložené interné odkazy zo starej cesty na novú; nevytvára tým alternatívny HTTP vstup.
+Prehliadač neprenesie cookie medzi doménami, takže sa používateľ na novej adrese znovu prihlási zvoleným spôsobom. Na novej doméne tiež vedome zapne push a prípadne nahradí starú ikonu PWA. Server používa iba aktuálnu cestu z `APP_URL`: `/zk`, `/priprava` alebo koreň subdomény; `APP_URL` neobsahuje prihlasovacie údaje, query ani fragment. Podrobnosti sú v [DEPLOYMENT.md](DEPLOYMENT.md).
 
-HTTP runtime akceptuje `/healthz` aj pre lokálnu Docker kontrolu, ostatné cesty kontrolujú Host. `/` presmeruje na aktívny koreň aplikácie. Endpointy mimo aktívneho prefixu vracajú 404. Podporované cesty `APP_URL` sú výhradne `/zk` a `/priprava` (voliteľne s koncovou lomkou); holý origin, iná cesta, prihlasovacie údaje v URL, query alebo fragment neprejdú validáciou. Pred štartom sa overí zhodná cesta frontend buildu a servera, aby po prepnutí nevznikol rozbitý mix starých assetov a nových endpointov.
+## Technické podklady
 
-## Vývoj a testovanie bez SMTP
-
-Vo vývoji je verejná cesta rovnaká, napr. `APP_URL=http://localhost:3000/zk` alebo `http://localhost:3000/priprava`. Možno nastaviť `AUTH_MAIL_MODE=file`. Kódy sú potom v súkromných JSON súboroch adresára `MAIL_DIRECTORY` s oprávnením 0600 (adresár 0700). Neobjavujú sa v API odpovedi ani v klientskom JavaScripte. Súkromný mailbox je iba lokálny vývojový nástroj a neoveruje doručenie do reálnej schránky. Ak nie je nastavené vývojové tajomstvo, vytvorí sa náhodné trvalé tajomstvo v `.data/auth-secret` s oprávnením 0600.
-
-`node --experimental-strip-types --test tests/auth.test.ts` skutočne vykonáva HTTP-kompatibilné Better Auth handlery, vytvorenie kódu, overenie, session cookie, expiráciu, počet pokusov, limity, odhlásenie, odobraté členstvo, cudzie originy, podvrhnuté hlavičky a opätovné otvorenie databázy. Ďalšie testy vykonávajú OTP prihlásenie v oboch režimoch na rovnakej databáze, kontrolujú cestu a Secure príznak cookie, zachovanie členstva po presune, odmietnutie neaktívnej HTTP cesty a nesúlad buildu s runtime konfiguráciou. Mail je v testoch zachytený súkromnou testovacou funkciou; žiadny kód nie je napevno nastavený. Produkčné SMTP, DNS/SPF/DKIM a doručenie do schránok účastníkov vyžadujú samostatné prevádzkové overenie.
-
-## Oficiálne technické podklady
-
-- [Better Auth: SQLite vrátane Node DatabaseSync](https://better-auth.com/docs/adapters/sqlite)
+- [Better Auth: SQLite](https://better-auth.com/docs/adapters/sqlite)
+- [Better Auth: username](https://better-auth.com/docs/plugins/username)
 - [Better Auth: email OTP](https://better-auth.com/docs/plugins/email-otp)
-- [Better Auth: schéma a programové migrácie](https://better-auth.com/docs/concepts/database)
-- [Better Auth: limity požiadaviek a dôveryhodné proxy](https://better-auth.com/docs/concepts/rate-limit)
-- [Better Auth: konfigurácia originu a cookies](https://better-auth.com/docs/reference/options)
+- [Better Auth: migrácie](https://better-auth.com/docs/concepts/database)
+- [Better Auth: limity a proxy](https://better-auth.com/docs/concepts/rate-limit)
+- [Better Auth: origin a cookies](https://better-auth.com/docs/reference/options)
 
-Overené pri implementácii 25. 10. 2026. Presnú inštalovanú verziu a transitive závislosti uzamyká lockfile.
+Presné verzie závislostí sú uzamknuté v lockfile. Rozsah skutočne vykonaných kontrol uvádza [TESTING.md](TESTING.md); konfigurácia v tomto dokumente nie je potvrdením živého nasadenia.

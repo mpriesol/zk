@@ -3,17 +3,25 @@
 ## Súhrn odovzdanej verzie (25. 10. 2026)
 
 - `npm run typecheck`: bez chýb.
-- `npm test`: **106/106 úspešných**, 0 preskočených. Rozdelenie: pravidlá 19, backend 40, autentifikácia 18, push/outbox 20, záloha/obnova 2, veverička 5 a request ID 2.
-- Produkčný build osobitne s `APP_URL=https://hub.biketrek.sk/zk` aj `APP_URL=https://zimnykurz.sk/priprava`: úspešný. Skontrolované prefixy HTML/manifestu, ikony a absencia vývojového vizuálneho testu v klientskom balíku.
-- Produkčný Node runtime spustený s novou dočasnou SQLite osobitne pre `/zk` aj `/priprava`: úspešné HTTP kontroly presmerovania na prefix, HTML/assetov, manifestu, service workera, neprihláseného API (401), odmietnutia cudzieho Host, nesprávneho prefixu a izolácie vývojových súborov. SMTP ani push sa pri tejto skúške neposielali.
-- Caddy 2.11.7: **22 živých lokálnych kontrol** oboch nasadení, vrátane zachovania ostatných ciest, query, request body, hlavičiek a cookies. `scripts/check-caddy.mjs` je opakovateľná kontrola; nejde o skúšku na produkčnom Hube.
+- `npm test`: **146/146 úspešných**, 0 preskočených. Rozdelenie: pravidlá 19, backend 40, pôvodná autentifikácia 18, heslová autentifikácia 35, vytvorenie organizátora cez CLI 3, nasadenie na subdoménu a presun 2, push/outbox 20, záloha/obnova 2, veverička 5 a request ID 2.
+- Produkčný build osobitne s `APP_URL=https://hub.biketrek.sk/zk` aj `APP_URL=https://zimnykurz.sk/priprava` a `APP_URL=https://priprava.zimnykurz.sk`: úspešný. Skontrolované prefixy HTML/manifestu, ikony a absencia vývojového vizuálneho testu v klientskom balíku.
+- Produkčný Node runtime v režime `AUTH_MODE=password` bez SMTP konfigurácie spustený s novou dočasnou SQLite osobitne pre `/zk`, `/priprava` aj koreň samostatnej subdomény: úspešné HTTP kontroly dostupných spôsobov prihlásenia, presmerovania na prefix, HTML/assetov, manifestu, service workera, neprihláseného API (401), odmietnutia cudzieho Host, nesprávneho prefixu a izolácie vývojových súborov. SMTP ani push sa pri tejto skúške neposielali.
+- Caddy 2.11.7: **41 živých lokálnych kontrol** všetkých troch variantov nasadenia, vrátane zachovania ostatných ciest, query, request body, hlavičiek a cookies. `scripts/check-caddy.mjs` je opakovateľná kontrola; nejde o skúšku na produkčnom Hube.
 - Prehliadač Chrome: skutočná neprihlásená stránka a izolované komponentové vizuálne testy na desktope vrátane šírok 1920 a 2560 px a v šírkach 360, 390 a 768 px. Overená matica/skupina, odmeny, administrácia, formulár a zachovanie jeho textu po odmietnutí zápisu. Bez horizontálneho pretečenia celej stránky. Pri formulári sa veverička schová.
+- Nový registračný formulár overený v Chrome na desktope a pri šírke 360 px: prezývka a heslo, nepovinné meno a priezvisko a presná poznámka „Ostatní účastníci uvidia iba tvoju prezývku.“ Heslová registrácia sa v tejto prehliadačovej kontrole neodosielala; funkčný priebeh overujú integračné testy so skutočnou Better Auth.
+- Prvý organizátor: automatické testy CLI a skutočný interaktívny produkčný PTY so skúšobnými údajmi. Heslo sa nezobrazilo, uložený účet používa Better Auth hash a SMTP nebolo potrebné.
 
 Vizuálny test `tests/visual-harness.tsx` sa zapína iba vo vývoji cez `ENABLE_VISUAL_QA=1`, používa výslovne označené fiktívne údaje a má vypnuté zápisy. **Nie je to prihlásenie ani end-to-end skúška prihláseného používateľa v prehliadači.** Nie je súčasťou produkčného buildu.
 
 Auth sada používa skutočnú Better Auth, jednorazové kódy, session/cookies a SQLite; zahŕňa vypršanie/chybné kódy, oprávnenia, opätovné otvorenie databázy a prepnutie z Hub URL na verejnú URL pri zachovaní účtov. E-maily zachytáva do izolovaného testovacieho transportu, neposiela ich externým ľuďom.
 
-**Pred prevádzkou zostáva overiť:** Docker build a štart na Hube (v testovacom prostredí nie je Docker), produkčné SMTP doručenie, plný prihlasovací priebeh v používateľskom prehliadači, PWA a push na skutočnom Androide/iPhone, pravidelnú zálohu a obnovu na serveri a neskôr verejnú proxy na hostingu zimnykurz.sk. Produkcia, DNS ani existujúci bežiaci Caddy sa počas implementácie nemenili.
+Heslová sada `tests/password-auth.test.ts` navyše overuje registráciu bez e-mailu, normalizáciu a jedinečnosť prezývky, čakajúce účty a schvaľovanie, pozvánky s limitom použití, 30-dňové cookies a ich obnovovanie, revokáciu členstva, zmenu a obnovu hesla, odhlásenie ostatných zariadení, obmedzenia pokusov a ochranu Origin. Testuje aj atómové vrátenie neúspešnej obnovy hesla, uchovanie účtu po opätovnom otvorení databázy, ukrytie interných technických adries a súkromného mena v skupinovom feede vrátane aktivity a komentára. Kombinovaný režim zachová heslo dôveryhodne vytvoreného prvého organizátora aj po overení e-mailovým OTP; negatívne prípady zachovávajú ochranu Better Auth proti neovereným prepojeniam účtov.
+
+Deterministický súbežný test pozastaví skutočnú transakciu Better Auth počas hashovania hesla. Súbežná administrátorská zmena a SQL zápis pracovníka frontu čakajú, potom sa samostatne uložia pri úspechu registrácie aj po jej vynútenom rollbacku. Odosielanie do siete neblokuje databázový front pracovníka.
+
+Samostatná sada `tests/root-deployment.test.ts` overuje skutočné cookies `Path=/` bez Domain, registráciu a obnovu hesla na subdoméne. Presun z Hubu používa ten istý databázový súbor: zachová účty, aktivity, platné pozývacie a resetovacie tokeny, normalizuje staré odkazy na správy a podporuje nové heslové aj OTP prihlásenie.
+
+**Pred prevádzkou zostáva overiť:** Docker build a štart na Hube (v testovacom prostredí nie je Docker), plný prihlasovací priebeh v používateľskom prehliadači, PWA a push na skutočnom Androide/iPhone, pravidelnú zálohu a obnovu na serveri a neskôr DNS/TLS samostatnej subdomény (alebo verejnú proxy pri alternatíve `/priprava`). SMTP doručenie treba nakonfigurovať a overiť iba pri zapnutí voliteľného e-mailového režimu; heslové prihlasovanie ho nepotrebuje. Produkcia, DNS ani existujúci bežiaci Caddy sa počas implementácie nemenili.
 
 ## Automatické integračné overenie backendu
 

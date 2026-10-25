@@ -1,6 +1,6 @@
 # Produkt v1
 
-Jeden aktuálny kurz s identifikátorom `COURSE_ID`, dospelí pozvaní účastníci a organizátori. Každé API kontroluje aktívne členstvo; session odobratého člena nezabezpečí prístup. Ostatní členovia vidia prezývku, nie e-mail. Súhrny sú záznamy dobrovoľnej aktivity, nikdy zdravotné skóre alebo dôkaz neaktivity.
+Jeden aktuálny kurz s identifikátorom `COURSE_ID`, dospelí pozvaní účastníci a organizátori. Účet možno vytvoriť prezývkou a heslom bez e-mailu. Meno a priezvisko sú nepovinné a súkromné; ostatní účastníci vidia iba prezývku. Platný pozývací odkaz umožní vstup, inak nová registrácia čaká na schválenie organizátorom. SMTP/e-mailový kód ostáva voliteľný spôsob prihlásenia. Každé API kontroluje aktívne členstvo; session odobratého člena nezabezpečí prístup. Ostatní členovia vidia prezývku, nie e-mail. Súhrny sú záznamy dobrovoľnej aktivity, nikdy zdravotné skóre alebo dôkaz neaktivity.
 
 ## Obrazovky
 

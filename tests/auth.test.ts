@@ -337,6 +337,7 @@ test("development mail is a private filesystem delivery, never an API response",
 test("production fails closed without secret, HTTPS, SMTP or with development file delivery", () => {
   const common = {
     NODE_ENV: "production",
+    AUTH_MODE: "email",
     APP_URL: "https://zimny.example/priprava",
     BETTER_AUTH_SECRET: settings.secret,
     SMTP_HOST: "smtp.example",
@@ -458,7 +459,8 @@ test("canonical application prefix isolates API routes and validates deployment 
     MAIL_FROM: "x@example.test",
   };
   assert.throws(
-    () => authSettingsFromEnv({ ...config, APP_URL: "https://zimnykurz.sk" }),
+    () =>
+      authSettingsFromEnv({ ...config, APP_URL: "https://zimnykurz.sk/other" }),
     /priprava/,
   );
   assert.equal(
@@ -590,11 +592,10 @@ test("one database works on Hub /zk first and public /priprava after switching A
   }
 });
 
-test("base-path helpers validate both deployment modes and normalize saved app links only", () => {
+test("base-path helpers validate supported deployments and normalize saved app links only", () => {
   assert.equal(basePathFromUrl("https://hub.biketrek.sk/zk/"), "/zk");
   assert.equal(basePathFromUrl("https://zimnykurz.sk/priprava"), "/priprava");
   for (const value of [
-    "https://x.example/",
     "https://x.example/else",
     "https://x.example/zk?x=1",
     "https://x.example/priprava#x",

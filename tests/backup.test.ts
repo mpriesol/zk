@@ -80,7 +80,7 @@ test("online WAL backup and explicit offline restore preserve recoverable previo
   }
 });
 
-test("Caddy rendering selects initial Hub and later public mode from APP_URL and rejects injection", () => {
+test("Caddy rendering selects Hub, public path or separate subdomain from APP_URL and rejects injection", () => {
   const script = new URL("../scripts/render-caddy.mjs", import.meta.url)
     .pathname;
   const run = (appUrl: string) =>
@@ -106,4 +106,20 @@ test("Caddy rendering selects initial Hub and later public mode from APP_URL and
   assert.match(valid.stdout, /header_up X-Real-IP \{client_ip\}/);
   assert.match(valid.stdout, /reverse_proxy zk-app:3000/);
   assert.doesNotMatch(valid.stdout, /respond hacked|example\.test/);
+  const subdomain = run("https://priprava.zimnykurz.sk/");
+  assert.equal(subdomain.status, 0, subdomain.stderr);
+  assert.match(subdomain.stdout, /^priprava\.zimnykurz\.sk\s*\{/m);
+  assert.match(subdomain.stdout, /header_up Host priprava\.zimnykurz\.sk/);
+  assert.match(
+    subdomain.stdout,
+    /header_up X-Forwarded-Host priprava\.zimnykurz\.sk/,
+  );
+  assert.match(subdomain.stdout, /header_up X-Real-IP \{client_ip\}/);
+  assert.match(subdomain.stdout, /reverse_proxy zk-app:3000/);
+  assert.doesNotMatch(
+    subdomain.stdout,
+    /uri path_regexp|handle_path|@cestouZimyGateway/,
+  );
+  assert.notEqual(run("https://priprava.zimnykurz.sk/zk").status, 0);
+  assert.notEqual(run("https://priprava.zimnykurz.sk.example.test").status, 0);
 });

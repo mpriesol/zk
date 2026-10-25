@@ -1,5 +1,6 @@
 "use client";
 import { appPath } from "../lib/paths";
+import AccountAdmin from "./AccountAdmin";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -322,10 +323,12 @@ export default function AdminPanel({
   state,
   onAction,
   visualFixture,
+  onMembershipChanged,
 }: {
   state: AppState;
   onAction: Action;
   visualFixture?: AdminData;
+  onMembershipChanged?: () => Promise<void> | void;
 }) {
   const [tab, setTab] = useState<Tab>("course");
   const [exportDataset, setExportDataset] =
@@ -334,6 +337,7 @@ export default function AdminPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [emailOtpEnabled, setEmailOtpEnabled] = useState(false);
   const [course, setCourse] = useState<Course>(state.course);
   const [invite, setInvite] = useState({
     email: "",
@@ -584,64 +588,76 @@ export default function AdminPanel({
       )}
       {tab === "members" && (
         <div className="stack">
-          <form
-            className="panel stack"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                await run(
-                  "inviteMember",
-                  invite,
-                  "Členstvo je pripravené. Stav odoslania pozvánky nájdeš v záznamoch.",
-                );
-                setInvite({ email: "", nickname: "", role: "participant" });
-              } catch {}
+          <AccountAdmin
+            disabled={!!visualFixture}
+            onEmailAvailability={setEmailOtpEnabled}
+            onChanged={async () => {
+              await load();
+              await onMembershipChanged?.();
             }}
-          >
-            <h3>Pozvať účastníka</h3>
-            <p className="muted">
-              Pozvánka platí iba pre tento kurz. Účastník sa prihlási účtom s
-              týmto e-mailom.
-            </p>
-            <div className="grid-two">
+          />
+          {emailOtpEnabled && (
+            <form
+              className="panel stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await run(
+                    "inviteMember",
+                    invite,
+                    "Členstvo je pripravené. Stav odoslania pozvánky nájdeš v záznamoch.",
+                  );
+                  setInvite({ email: "", nickname: "", role: "participant" });
+                } catch {}
+              }}
+            >
+              <h3>Pozvať cez e-mail</h3>
+              <p className="muted">
+                Pozvánka platí iba pre tento kurz. Účastník sa prihlási účtom s
+                týmto e-mailom.
+              </p>
+              <div className="grid-two">
+                <label className="field">
+                  E-mail
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={invite.email}
+                    onChange={(e) =>
+                      setInvite({ ...invite, email: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Meno alebo prezývka
+                  <input
+                    required
+                    maxLength={50}
+                    value={invite.nickname}
+                    onChange={(e) =>
+                      setInvite({ ...invite, nickname: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
               <label className="field">
-                E-mail
-                <input
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={invite.email}
+                Rola
+                <select
+                  value={invite.role}
                   onChange={(e) =>
-                    setInvite({ ...invite, email: e.target.value })
+                    setInvite({ ...invite, role: e.target.value })
                   }
-                />
+                >
+                  <option value="participant">Účastník</option>
+                  <option value="admin">Organizátor</option>
+                </select>
               </label>
-              <label className="field">
-                Meno alebo prezývka
-                <input
-                  required
-                  maxLength={50}
-                  value={invite.nickname}
-                  onChange={(e) =>
-                    setInvite({ ...invite, nickname: e.target.value })
-                  }
-                />
-              </label>
-            </div>
-            <label className="field">
-              Rola
-              <select
-                value={invite.role}
-                onChange={(e) => setInvite({ ...invite, role: e.target.value })}
-              >
-                <option value="participant">Účastník</option>
-                <option value="admin">Organizátor</option>
-              </select>
-            </label>
-            <button className="button primary" disabled={busy}>
-              <Mail size={18} /> Pripraviť a odoslať pozvánku
-            </button>
-          </form>
+              <button className="button primary" disabled={busy}>
+                <Mail size={18} /> Pripraviť a odoslať pozvánku
+              </button>
+            </form>
+          )}
           <div className="panel stack">
             <h3>
               Členovia kurzu{" "}
@@ -650,76 +666,86 @@ export default function AdminPanel({
             {data.members
               .slice()
               .sort((a, b) => a.nickname.localeCompare(b.nickname, "sk"))
-              .map((member) => (
-                <article className="admin-member card" key={member.id}>
-                  <div>
-                    <strong>{member.nickname}</strong>
-                    <p className="muted">
-                      {member.email} ·{" "}
-                      {member.role === "admin" ? "organizátor" : "účastník"} ·{" "}
-                      {member.active
-                        ? member.userId
-                          ? "prihlásený"
-                          : "pozvaný"
-                        : "členstvo zrušené"}
-                    </p>
-                  </div>
-                  <div className="button-row">
-                    <button
-                      className="button secondary"
-                      disabled={busy || !member.active}
-                      onClick={() =>
-                        perform(
-                          "resendInvite",
-                          { id: member.id },
-                          "Pozvánka bola zaradená na odoslanie.",
-                        )
-                      }
-                    >
-                      Znova pozvať
-                    </button>
-                    <button
-                      className="button secondary"
-                      disabled={busy || member.id === state.me.id}
-                      onClick={() => {
-                        const role =
-                          member.role === "admin" ? "participant" : "admin";
-                        if (
-                          window.confirm(
-                            `Zmeniť rolu používateľa ${member.nickname} na ${role === "admin" ? "organizátora" : "účastníka"}?`,
+              .map((member) => {
+                const contactEmail =
+                  member.email && !/@[^@]*\.invalid$/i.test(member.email)
+                    ? member.email
+                    : undefined;
+                return (
+                  <article className="admin-member card" key={member.id}>
+                    <div>
+                      <strong>{member.nickname}</strong>
+                      <p className="muted">
+                        {contactEmail ? `${contactEmail} · ` : ""}
+                        {member.role === "admin"
+                          ? "organizátor"
+                          : "účastník"} ·{" "}
+                        {member.active
+                          ? member.userId
+                            ? "aktívny účet"
+                            : "pozvaný"
+                          : "neaktívne členstvo"}
+                      </p>
+                    </div>
+                    <div className="button-row">
+                      {emailOtpEnabled && contactEmail && (
+                        <button
+                          className="button secondary"
+                          disabled={busy || !member.active}
+                          onClick={() =>
+                            perform(
+                              "resendInvite",
+                              { id: member.id },
+                              "Pozvánka bola zaradená na odoslanie.",
+                            )
+                          }
+                        >
+                          Znova pozvať
+                        </button>
+                      )}
+                      <button
+                        className="button secondary"
+                        disabled={busy || member.id === state.me.id}
+                        onClick={() => {
+                          const role =
+                            member.role === "admin" ? "participant" : "admin";
+                          if (
+                            window.confirm(
+                              `Zmeniť rolu používateľa ${member.nickname} na ${role === "admin" ? "organizátora" : "účastníka"}?`,
+                            )
                           )
-                        )
-                          perform("updateMember", { id: member.id, role });
-                      }}
-                    >
-                      {member.role === "admin"
-                        ? "Zmeniť na účastníka"
-                        : "Zmeniť na organizátora"}
-                    </button>
-                    <button
-                      className={
-                        "button " + (member.active ? "danger" : "secondary")
-                      }
-                      disabled={busy || member.id === state.me.id}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            member.active
-                              ? `Zrušiť členstvo pre ${member.nickname}? Prístup sa zastaví aj na už prihlásených zariadeniach.`
-                              : `Obnoviť členstvo pre ${member.nickname}?`,
+                            perform("updateMember", { id: member.id, role });
+                        }}
+                      >
+                        {member.role === "admin"
+                          ? "Zmeniť na účastníka"
+                          : "Zmeniť na organizátora"}
+                      </button>
+                      <button
+                        className={
+                          "button " + (member.active ? "danger" : "secondary")
+                        }
+                        disabled={busy || member.id === state.me.id}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              member.active
+                                ? `Zrušiť členstvo pre ${member.nickname}? Prístup sa zastaví aj na už prihlásených zariadeniach.`
+                                : `Obnoviť členstvo pre ${member.nickname}?`,
+                            )
                           )
-                        )
-                          perform("updateMember", {
-                            id: member.id,
-                            active: !member.active,
-                          });
-                      }}
-                    >
-                      {member.active ? "Zrušiť členstvo" : "Obnoviť členstvo"}
-                    </button>
-                  </div>
-                </article>
-              ))}
+                            perform("updateMember", {
+                              id: member.id,
+                              active: !member.active,
+                            });
+                        }}
+                      >
+                        {member.active ? "Zrušiť členstvo" : "Obnoviť členstvo"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
           </div>
         </div>
       )}

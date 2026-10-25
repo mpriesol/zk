@@ -1,0 +1,26 @@
+# Separate TOP-LEVEL site, beside the existing Hub/SPS sites, never inside them.
+# Preferred future canonical URL: https://priprava.zimnykurz.sk
+# DNS for this subdomain must point to this Caddy server; keep zimnykurz.sk unchanged.
+# Replace the old Hub /zk handler with Caddyfile.zk.redirect after switching APP_URL.
+priprava.zimnykurz.sk {
+    encode zstd gzip
+    request_body {
+        max_size 1MB
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        -Server
+    }
+    reverse_proxy zk-app:3000 {
+        header_up Host priprava.zimnykurz.sk
+        header_up X-Forwarded-Host priprava.zimnykurz.sk
+        header_up X-Forwarded-Proto https
+        # Socket peer unless an explicitly trusted upstream proxy is configured.
+        header_up X-Real-IP {client_ip}
+        # Keep browser Origin unchanged for the app's CSRF checks.
+        header_up -Oai-Authenticated-User-Id
+        header_up -Oai-Authenticated-User-Email
+        header_up -Oai-Authenticated-User-Full-Name
+    }
+}

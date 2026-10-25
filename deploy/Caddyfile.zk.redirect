@@ -1,0 +1,10 @@
+# INSIDE the existing hub.biketrek.sk site, REPLACING only its old ZK handler.
+# Use only after APP_URL has switched to https://priprava.zimnykurz.sk.
+# Preserve all unrelated Hub/SPS routes. Never leave a second live ZK origin.
+@cestouZimyMoved path /zk /zk/*
+handle @cestouZimyMoved {
+    route {
+        uri strip_prefix /zk
+        redir https://priprava.zimnykurz.sk{uri} 308
+    }
+}
