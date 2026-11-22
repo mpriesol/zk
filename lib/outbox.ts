@@ -143,7 +143,7 @@ export async function drainOutbox(
       }
       const member = await one(
         db,
-        "SELECT id,email,nickname,active FROM members WHERE id=? AND course_id=?",
+        "SELECT id,email,nickname,active,role FROM members WHERE id=? AND course_id=?",
         job.member_id,
         job.course_id,
       );
@@ -209,7 +209,7 @@ export async function drainOutbox(
       }
       const recipient = await one(
         db,
-        "SELECT r.id FROM recipients r JOIN messages m ON m.id=r.message_id WHERE r.message_id=? AND r.member_id=? AND m.course_id=? AND m.status='sent'",
+        "SELECT r.id,m.data FROM recipients r JOIN messages m ON m.id=r.message_id WHERE r.message_id=? AND r.member_id=? AND m.course_id=? AND m.status='sent'",
         job.reference_id,
         job.member_id,
         job.course_id,
@@ -219,6 +219,27 @@ export async function drainOutbox(
           "cancelled",
           "Správa už nie je sprístupnená tomuto členovi.",
         );
+        continue;
+      }
+      const message = decode(recipient.data);
+      const membershipNotice = message.kind === "membership_request";
+      if (membershipNotice && member.role !== "admin") {
+        await finish(
+          "cancelled",
+          "Organizátorské oprávnenie už nie je aktívne.",
+        );
+        continue;
+      }
+      if (
+        membershipNotice &&
+        !(await one(
+          db,
+          "SELECT id FROM membership_requests WHERE id=? AND course_id=? AND status='pending'",
+          message.requestId,
+          job.course_id,
+        ))
+      ) {
+        await finish("cancelled", "Žiadosť je už vybavená.");
         continue;
       }
       const allSubscriptions = await rows(
@@ -284,11 +305,14 @@ export async function drainOutbox(
         if (!lease) break;
         const stillActive = await one(
           db,
-          "SELECT active FROM members WHERE id=? AND course_id=?",
+          "SELECT active,role FROM members WHERE id=? AND course_id=?",
           job.member_id,
           job.course_id,
         );
-        if (!stillActive?.active) {
+        if (
+          !stillActive?.active ||
+          (membershipNotice && stillActive.role !== "admin")
+        ) {
           await finish(
             "cancelled",
             "Členstvo bolo odobraté počas odosielania.",
@@ -335,7 +359,10 @@ export async function drainOutbox(
             {
               messageId: job.reference_id,
               title: "Cestou Zimy",
-              body: "Organizátor ti poslal novú správu. Otvor ju v aplikácii.",
+              body: membershipNotice
+                ? "Nový člen čaká na schválenie. Otvor administráciu."
+                : "Organizátor ti poslal novú správu. Otvor ju v aplikácii.",
+              ...(membershipNotice ? { url: String(message.link || "") } : {}),
             },
             {
               publicKey: cfg.vapidPublicKey || "",

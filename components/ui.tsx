@@ -7,6 +7,12 @@ import {
   Activity as ActivityIcon,
   Check,
   Flame,
+  Bike,
+  MountainSnow,
+  PersonStanding,
+  Waves,
+  Snowflake,
+  Route,
 } from "lucide-react";
 import type { ActivityGroup } from "../lib/types";
 export function Modal({
@@ -59,47 +65,87 @@ export function Modal({
     </dialog>
   );
 }
-export function Avatar({ name, size = "" }: { name: string; size?: string }) {
+export function Avatar({
+  name,
+  size = "",
+  imageUrl,
+}: {
+  name: string;
+  size?: string;
+  imageUrl?: string | null;
+}) {
   return (
     <span className={`avatar ${size}`} aria-hidden="true">
-      {name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((s) => s[0])
-        .join("")
-        .toUpperCase()}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          onLoad={(event) => {
+            event.currentTarget.hidden = false;
+          }}
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
+      ) : null}
+      <span>
+        {name
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((s) => s[0])
+          .join("")
+          .toUpperCase()}
+      </span>
     </span>
   );
 }
 export function SportIcon({
   group,
   size = 20,
+  typeName = "",
 }: {
   group: ActivityGroup;
   size?: number;
+  typeName?: string;
 }) {
-  const Icon =
-    group === "foot"
-      ? Footprints
-      : group === "exercise"
-        ? Dumbbell
-        : group === "task"
-          ? Check
-          : ActivityIcon;
-  return <Icon size={size} />;
+  const name = typeName.toLocaleLowerCase("sk");
+  const Icon = /sprch|otuž/.test(name)
+    ? Snowflake
+    : /bicy|cykli/.test(name)
+      ? Bike
+      : /pláv/.test(name)
+        ? Waves
+        : /turist|horsk/.test(name)
+          ? MountainSnow
+          : /beh/.test(name)
+            ? Route
+            : /prechádz|chôdz/.test(name)
+              ? Footprints
+              : group === "foot"
+                ? Footprints
+                : group === "exercise"
+                  ? Dumbbell
+                  : group === "task"
+                    ? Check
+                    : ActivityIcon;
+  return <Icon size={size} aria-hidden="true" />;
 }
 export function Gem({
   earned = false,
   index = 0,
+  color,
 }: {
   earned?: boolean;
   index?: number;
+  color?: string;
 }) {
   return (
     <span
       className={`gem gem-${index % 5} ${earned ? "earned" : ""}`}
       aria-hidden="true"
+      style={color ? { color } : undefined}
     >
       <svg viewBox="0 0 48 48">
         <path

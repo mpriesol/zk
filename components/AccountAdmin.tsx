@@ -45,6 +45,13 @@ type AccountAdminData = {
   passwordMembers: PasswordMember[];
   passwordEnabled: boolean;
   emailOtpEnabled: boolean;
+  focusedRequest?: {
+    id: string;
+    status: string;
+    nickname: string;
+    createdAt: string;
+    reviewedAt: string | null;
+  } | null;
 };
 type IssuedLink = {
   kind: "invite" | "reset";
@@ -68,10 +75,12 @@ export default function AccountAdmin({
   disabled = false,
   onChanged,
   onEmailAvailability,
+  requestId,
 }: {
   disabled?: boolean;
   onChanged?: () => Promise<void> | void;
   onEmailAvailability: (enabled: boolean) => void;
+  requestId?: string | null;
 }) {
   const [data, setData] = useState<AccountAdminData | null>(null);
   const [error, setError] = useState("");
@@ -89,17 +98,21 @@ export default function AccountAdmin({
   }, [issued]);
   const load = useCallback(async () => {
     if (disabled) return;
-    const response = await fetch(appPath("/api/registration/admin"), {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
+    const response = await fetch(
+      appPath("/api/registration/admin") +
+        (requestId ? `?request=${encodeURIComponent(requestId)}` : ""),
+      {
+        cache: "no-store",
+        credentials: "same-origin",
+      },
+    );
     const body = await response.json();
     if (!response.ok)
       throw new Error(body.error || "Správu účtov sa nepodarilo načítať.");
     setData(body as AccountAdminData);
     if (body.passwordEnabled === false) setIssued(null);
     onEmailAvailability(body.emailOtpEnabled === true);
-  }, [disabled, onEmailAvailability]);
+  }, [disabled, onEmailAvailability, requestId]);
   useEffect(() => {
     void load().catch((e) => setError(errorText(e)));
   }, [load]);
@@ -171,6 +184,15 @@ export default function AccountAdmin({
 
   return (
     <div className="stack">
+      {requestId && data && (
+        <p className="info-note" role="status">
+          {data.focusedRequest
+            ? data.focusedRequest.status === "pending"
+              ? `Žiadosť od ${data.focusedRequest.nickname} čaká na schválenie.`
+              : `Žiadosť od ${data.focusedRequest.nickname} už bola ${data.focusedRequest.status === "approved" ? "schválená" : "zamietnutá"}.`
+            : "Táto žiadosť už nie je dostupná. Aktuálne registrácie nájdeš nižšie."}
+        </p>
+      )}
       <section className="panel stack">
         <div className="section-head">
           <div>

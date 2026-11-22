@@ -1,6 +1,13 @@
 "use client";
 import { appPath } from "../lib/paths";
 import AccountAdmin from "./AccountAdmin";
+import SeasonAdmin, {
+  AwardVisualPicker,
+  PersonalAwardsAdmin,
+} from "./SeasonAdmin";
+import AdminStatistics from "./AdminStatistics";
+import AwardArt from "./AwardArt";
+import type { AdminReportingData } from "../lib/reporting";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -23,15 +30,23 @@ import type {
   Course,
   Member,
   Message,
+  Motto,
+  PersonalAwardDefinition,
+  PersonalAwardGrant,
   Rule,
 } from "../lib/types";
 
 export type AdminData = {
+  course?: Course;
   members: Member[];
   types: ActivityType[];
   rules: Rule[];
   challenges: Challenge[];
   messages: Message[];
+  personalAwardDefinitions?: PersonalAwardDefinition[];
+  personalAwards?: PersonalAwardGrant[];
+  mottos?: Motto[];
+  reporting?: AdminReportingData;
   audit: Array<{
     id?: string;
     action: string;
@@ -84,6 +99,12 @@ const auditLabels: Record<string, string> = {
   saveMessage: "Uloženie oznámenia",
   sendMessage: "Publikovanie oznámenia",
   bootstrap: "Vytvorenie kurzu a prvého organizátora",
+  saveAwardDefinition: "Úprava osobitného ocenenia",
+  grantPersonalAward: "Udelenie osobitného ocenenia",
+  revokePersonalAward: "Odobratie osobitného ocenenia",
+  saveMotto: "Úprava citátu",
+  deleteMotto: "Odstránenie citátu",
+  startPreparation: "Spustenie prípravy na zimný kurz",
 };
 const exportDatasets = [
   {
@@ -146,7 +167,29 @@ type Tab =
   | "rules"
   | "challenges"
   | "messages"
+  | "personal-awards"
+  | "statistics"
+  | "settings"
   | "audit";
+function requestedSection(): Tab {
+  const requested =
+    typeof window === "undefined"
+      ? null
+      : new URL(window.location.href).searchParams.get("section");
+  const allowed: Tab[] = [
+    "course",
+    "members",
+    "types",
+    "rules",
+    "challenges",
+    "messages",
+    "personal-awards",
+    "statistics",
+    "settings",
+    "audit",
+  ];
+  return allowed.includes(requested as Tab) ? (requested as Tab) : "course";
+}
 const groupLabels: Record<ActivityGroup, string> = {
   foot: "Chôdza / turistika / beh",
   exercise: "Cvičenie",
@@ -330,15 +373,20 @@ export default function AdminPanel({
   visualFixture?: AdminData;
   onMembershipChanged?: () => Promise<void> | void;
 }) {
-  const [tab, setTab] = useState<Tab>("course");
+  const [tab, setTab] = useState<Tab>(requestedSection);
+  useEffect(() => {
+    setTab(requestedSection());
+  }, [state]);
   const [exportDataset, setExportDataset] =
     useState<ExportDataset>("activities");
   const [data, setData] = useState<AdminData | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [emailOtpEnabled, setEmailOtpEnabled] = useState(false);
   const [course, setCourse] = useState<Course>(state.course);
+  useEffect(() => setCourse(state.course), [state.course]);
   const [invite, setInvite] = useState({
     email: "",
     nickname: "",
@@ -413,7 +461,8 @@ export default function AdminPanel({
       startDate: state.today,
       endDate: state.today,
       condition: { kind: "manual", count: 1 },
-      reward: "Bonusový drahokam",
+      reward: "Bonusová odmena",
+      visual: { kind: "icon", value: "star" },
       status: "draft",
       hidden: true,
       typeId: null,
@@ -443,7 +492,10 @@ export default function AdminPanel({
     ["types", "Aktivity"],
     ["rules", "Odmeny"],
     ["challenges", "Výzvy"],
+    ["personal-awards", "Osobitné ocenenia"],
     ["messages", "Oznámenia"],
+    ["statistics", "Záverečné štatistiky"],
+    ["settings", "Rozšírené nastavenia"],
     ["audit", "Záznamy a export"],
   ];
   if (!data)
@@ -479,6 +531,10 @@ export default function AdminPanel({
             key={key}
             onClick={() => {
               setTab(key);
+              const url = new URL(window.location.href);
+              url.searchParams.set("section", key);
+              url.searchParams.delete("request");
+              history.replaceState(null, "", url);
               setNotice("");
               setError("");
             }}
@@ -513,6 +569,22 @@ export default function AdminPanel({
         >
           <h3>Základné nastavenia</h3>
           <label className="field">
+            Ročník hlavnej udalosti
+            <input
+              type="number"
+              required
+              min={2020}
+              max={2200}
+              value={
+                course.year ||
+                Number((course.eventStartDate || course.endDate).slice(0, 4))
+              }
+              onChange={(event) =>
+                setCourse({ ...course, year: Number(event.target.value) })
+              }
+            />
+          </label>
+          <label className="field">
             Názov ročníka
             <input
               required
@@ -546,6 +618,40 @@ export default function AdminPanel({
               />
             </label>
           </div>
+          <div className="grid-two">
+            <label className="field">
+              Začiatok hlavnej časti kurzu
+              <input
+                type="date"
+                value={course.eventStartDate || ""}
+                onChange={(event) =>
+                  setCourse({ ...course, eventStartDate: event.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              Koniec hlavnej časti kurzu
+              <input
+                type="date"
+                min={course.eventStartDate}
+                value={course.eventEndDate || ""}
+                onChange={(event) =>
+                  setCourse({ ...course, eventEndDate: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <p className="small muted">
+            Termín hlavnej časti over na{" "}
+            <a
+              href="https://zimnykurz.sk/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              zimnykurz.sk
+            </a>
+            . Ročník sa riadi rokom tejto udalosti.
+          </p>
           <label className="field">
             Časová zóna
             <input
@@ -560,7 +666,7 @@ export default function AdminPanel({
             </small>
           </label>
           <label className="field">
-            Najviac vystúpení veveričky za reláciu
+            Najviac vystúpení medvedíka za reláciu
             <input
               type="number"
               min="0"
@@ -571,16 +677,6 @@ export default function AdminPanel({
               }
             />
           </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={course.testMode}
-              onChange={(e) =>
-                setCourse({ ...course, testMode: e.target.checked })
-              }
-            />{" "}
-            Označiť ako testovací ročník
-          </label>
           <button className="button primary" disabled={busy}>
             <Settings size={18} /> Uložiť nastavenia
           </button>
@@ -589,6 +685,11 @@ export default function AdminPanel({
       {tab === "members" && (
         <div className="stack">
           <AccountAdmin
+            requestId={
+              typeof window === "undefined"
+                ? null
+                : new URL(window.location.href).searchParams.get("request")
+            }
             disabled={!!visualFixture}
             onEmailAvailability={setEmailOtpEnabled}
             onChanged={async () => {
@@ -883,6 +984,7 @@ export default function AdminPanel({
               className="panel stack"
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (mediaBusy) return;
                 try {
                   await run(
                     "saveRule",
@@ -892,6 +994,7 @@ export default function AdminPanel({
                       name: rule.name,
                       description: rule.description,
                       gem: rule.gem,
+                      visual: rule.visual,
                       condition: rule.condition,
                       active: rule.active,
                     },
@@ -912,15 +1015,13 @@ export default function AdminPanel({
                     onChange={(e) => setRule({ ...rule, name: e.target.value })}
                   />
                 </label>
-                <label className="field">
-                  Drahokam
-                  <input
-                    required
-                    value={rule.gem}
-                    onChange={(e) => setRule({ ...rule, gem: e.target.value })}
-                  />
-                </label>
               </div>
+              <AwardVisualPicker
+                value={rule.visual || { kind: "gem", value: rule.key }}
+                onChange={(visual) => setRule({ ...rule, visual })}
+                disabled={busy}
+                onUploadingChange={setMediaBusy}
+              />
               <label className="field">
                 Zrozumiteľný opis
                 <textarea
@@ -955,7 +1056,7 @@ export default function AdminPanel({
                 . Posledná verzia v{rule.version}, platná od{" "}
                 {displayDate(rule.effectiveFrom)}.
               </p>
-              <button className="button primary" disabled={busy}>
+              <button className="button primary" disabled={busy || mediaBusy}>
                 Uložiť budúcu verziu
               </button>
             </form>
@@ -1103,6 +1204,7 @@ export default function AdminPanel({
               <article key={item.id} className="card stack">
                 <div className="section-heading">
                   <div>
+                    <AwardArt visual={item.visual} earned label={item.name} />
                     <h4>{item.name}</h4>
                     <p className="muted">
                       {displayDate(item.startDate)} –{" "}
@@ -1158,6 +1260,11 @@ export default function AdminPanel({
             <article className="panel stack">
               <span className="eyebrow">ZVEREJNENÁ VÝZVA</span>
               <h3>{challenge.name}</h3>
+              <AwardArt
+                visual={challenge.visual}
+                earned
+                label={challenge.name}
+              />
               <p className="pre-wrap">{challenge.description}</p>
               <p>
                 {challenge.startDate} – {challenge.endDate}, oba dni vrátane.
@@ -1181,6 +1288,7 @@ export default function AdminPanel({
               onChange={() => setChallengeDirty(true)}
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (mediaBusy) return;
                 try {
                   const result = await run(
                     "saveChallenge",
@@ -1260,6 +1368,15 @@ export default function AdminPanel({
                   setChallenge({ ...challenge, condition })
                 }
               />
+              <AwardVisualPicker
+                value={challenge.visual}
+                onChange={(visual) => {
+                  setChallenge({ ...challenge, visual });
+                  setChallengeDirty(true);
+                }}
+                disabled={busy}
+                onUploadingChange={setMediaBusy}
+              />
               {challenge.typeId && (
                 <p>
                   Súvisiaca praktická úloha:{" "}
@@ -1276,7 +1393,7 @@ export default function AdminPanel({
                 skryté úlohy zostanú utajené.
               </p>
               <div className="button-row">
-                <button className="button primary" disabled={busy}>
+                <button className="button primary" disabled={busy || mediaBusy}>
                   Uložiť výzvu
                 </button>
                 <button
@@ -1299,6 +1416,11 @@ export default function AdminPanel({
                 <article className="card stack">
                   <span className="eyebrow">NÁHĽAD PRE ÚČASTNÍKA</span>
                   <h3>{challenge.name || "Názov výzvy"}</h3>
+                  <AwardArt
+                    visual={challenge.visual}
+                    earned
+                    label={challenge.name}
+                  />
                   <p className="pre-wrap">{challenge.description}</p>
                   <p>
                     Obdobie: {challenge.startDate} – {challenge.endDate}, oba
@@ -1324,7 +1446,7 @@ export default function AdminPanel({
                     <button
                       className="button primary"
                       type="button"
-                      disabled={busy || challengeDirty}
+                      disabled={busy || mediaBusy || challengeDirty}
                       onClick={async () => {
                         if (
                           !window.confirm(
@@ -1354,6 +1476,38 @@ export default function AdminPanel({
             </form>
           )}
         </div>
+      )}
+      {tab === "personal-awards" && (
+        <PersonalAwardsAdmin
+          definitions={data.personalAwardDefinitions || []}
+          grants={data.personalAwards || []}
+          members={data.members}
+          today={state.today}
+          course={data.course || state.course}
+          busy={busy}
+          onAction={run}
+        />
+      )}
+      {tab === "statistics" &&
+        (data.reporting ? (
+          <AdminStatistics
+            data={data.reporting}
+            course={data.course || state.course}
+            today={state.today}
+            authorized={state.me.role === "admin"}
+          />
+        ) : (
+          <section className="panel">
+            <p>Podklady pre štatistiky sa nepodarilo načítať.</p>
+          </section>
+        ))}
+      {tab === "settings" && (
+        <SeasonAdmin
+          course={data.course || state.course}
+          mottos={data.mottos || []}
+          onAction={run}
+          busy={busy}
+        />
       )}
       {tab === "messages" && (
         <div className="stack">

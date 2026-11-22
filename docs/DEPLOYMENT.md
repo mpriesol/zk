@@ -22,11 +22,11 @@ Výstupom poskytnutým prevádzkovateľom boli potvrdené Docker Compose **5.0.2
 
 Read-only kontrola repozitára [`jurajk/zkweb`](https://github.com/jurajk/zkweb) potvrdila statický build Gulp/Twig a [workflow](https://github.com/jurajk/zkweb/blob/master/.github/workflows/deploy.yml), ktorý publikuje `dist` na vetvu `gh-pages`; [CNAME](https://github.com/jurajk/zkweb/blob/master/CNAME) obsahuje `zimnykurz.sk`. Samotný PR v tomto repozitári nemôže pridať serverovú proxy pre aplikačné API. Subdoména tento problém rieši bez PR či zásahu do pôvodného webu. Audit repozitára sám osebe nepotvrdzuje aktuálne živé DNS. Alternatíva `https://zimnykurz.sk/priprava` zostáva pripravená pre prípad neskoršieho prístupu k skutočnej reverznej proxy.
 
-| Nastavenie `APP_URL` | Prehliadač a Node prefix | Hub Caddy `/zk/*` | Front hosting |
-|---|---|---|---|
-| `https://hub.biketrek.sk/zk` — prvé nasadenie | `/zk`, Host `hub.biketrek.sk` | Zachová cestu `/zk/*` | Netreba |
-| `https://priprava.zimnykurz.sk` — preferovaný presun | Koreň `/`, Host `priprava.zimnykurz.sk` | Presmeruje staré odkazy na novú adresu | DNS subdomény → Hub server; samostatný Caddy site |
-| `https://zimnykurz.sk/priprava` — neskorší presun | `/priprava`, Host `zimnykurz.sk` | Prepíše prefix `/zk` na `/priprava` | Proxy `/priprava/*` → `https://hub.biketrek.sk/zk/*` |
+| Nastavenie `APP_URL`                                 | Prehliadač a Node prefix                | Hub Caddy `/zk/*`                      | Front hosting                                        |
+| ---------------------------------------------------- | --------------------------------------- | -------------------------------------- | ---------------------------------------------------- |
+| `https://hub.biketrek.sk/zk` — prvé nasadenie        | `/zk`, Host `hub.biketrek.sk`           | Zachová cestu `/zk/*`                  | Netreba                                              |
+| `https://priprava.zimnykurz.sk` — preferovaný presun | Koreň `/`, Host `priprava.zimnykurz.sk` | Presmeruje staré odkazy na novú adresu | DNS subdomény → Hub server; samostatný Caddy site    |
+| `https://zimnykurz.sk/priprava` — neskorší presun    | `/priprava`, Host `zimnykurz.sk`        | Prepíše prefix `/zk` na `/priprava`    | Proxy `/priprava/*` → `https://hub.biketrek.sk/zk/*` |
 
 **Jediné nastavenie je `APP_URL` v `zk.env`, s príslušným prefixom alebo bez neho pri subdoméne.** Z neho build odvodí assety, navigáciu, service worker aj manifest; runtime odvodí API, auth a cookie scope. Docker build vytvorí `build-config.json`; server pri štarte overí zhodu s runtime prefixom, aby nebežal starý frontend na novej URL. Po zmene `APP_URL` je potrebný **rebuild image, reštart iba ZK kontajnera a nové vygenerovanie ZK Caddy konfigurácie**. Nie je potrebná ručná úprava zdrojového kódu ani samostatná premenná `APP_BASE_PATH`.
 
@@ -38,22 +38,22 @@ Nový kontajner nepublikuje hostiteľský port, používa `inventory-hub-net` a 
 
 Vyžaduje Docker Engine a Docker Compose **aspoň 2.30**, pretože `env_file.format: raw` zachová `$` a ďalšie znaky SMTP hesiel. Na serveri skopíruj `.env.example` do `zk.env`, vyplň skutočné hodnoty a nastav `chmod 600 zk.env`. V súbore `zk.env` hodnoty nepísať do obalových úvodzoviek; raw formát ich ponechá ako súčasť hodnoty. Pri priamom lokálnom Node spúšťaní môžeš používať `.env` podľa README.
 
-| Premenná | Význam |
-|---|---|
-| `APP_URL` | Teraz `https://hub.biketrek.sk/zk`; preferovaný presun `https://priprava.zimnykurz.sk`. Alternatíva `https://zimnykurz.sk/priprava` potrebuje verejnú proxy. Zmena vyžaduje rebuild a novú ZK Caddy konfiguráciu. |
-| `BETTER_AUTH_SECRET` | Náhodný tajný reťazec aspoň 32 znakov; napr. vytvorený `openssl rand -base64 48`. Uchovať mimo Git a záloh verejného kódu. |
-| `AUTH_MODE` | Predvolene `password`: používateľské meno a heslo bez SMTP. Voliteľne `email` alebo `both`. |
-| `BOOTSTRAP_ADMIN_EMAIL` | Voliteľná súkromná adresa prvého admina pri vytvorení cez CLI; zároveň bootstrap e-mail v režime `email`/`both`. Heslové prihlásenie ju nevyžaduje. |
-| `REGISTRATION_OPEN` | Predvolene otvorené; `false` zastaví nové heslové registrácie vrátane pozvánok. |
-| `COURSE_ID` | Identifikátor ročníka, predvolene `cestou-zimy`. Nemeniť pri bežnom reštarte. |
-| `AUTH_MAIL_MODE` | Pre produkčné e-maily `smtp`. `AUTH_MODE=password` e-maily nevyžaduje. Vývojové `file` sa v produkcii odmieta. |
-| `SMTP_HOST`, `SMTP_PORT` | Existujúci SMTP server a port, zvyčajne 587. |
-| `SMTP_SECURE` | `true` pre implicitné TLS na 465; pre 587 `false` s STARTTLS. |
-| `SMTP_USER`, `SMTP_PASSWORD` | SMTP prihlasovanie; možno vynechať iba pri úmyselne nakonfigurovanom dôveryhodnom relayi. |
-| `MAIL_FROM` | Overená adresa/odosielateľ povolený poskytovateľom SMTP. |
-| `TRUST_PROXY` | `1` iba za priloženým Caddy smerovaním, ktoré prepíše `X-Real-IP`; server nesmie byť dostupný priamo z internetu. |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Voliteľný web push; private key zostáva na serveri, subject je kontaktná `mailto:` alebo HTTPS adresa. Bez konfigurácie sa zapnutie push nepovažuje za úspešné. |
-| `DATABASE_PATH`, `HOST`, `PORT`, `NODE_ENV` | Compose nastavuje `/data/cestou-zimy.sqlite`, `0.0.0.0`, `3000`, `production`. |
+| Premenná                                                 | Význam                                                                                                                                                                                                            |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_URL`                                                | Teraz `https://hub.biketrek.sk/zk`; preferovaný presun `https://priprava.zimnykurz.sk`. Alternatíva `https://zimnykurz.sk/priprava` potrebuje verejnú proxy. Zmena vyžaduje rebuild a novú ZK Caddy konfiguráciu. |
+| `BETTER_AUTH_SECRET`                                     | Náhodný tajný reťazec aspoň 32 znakov; napr. vytvorený `openssl rand -base64 48`. Uchovať mimo Git a záloh verejného kódu.                                                                                        |
+| `AUTH_MODE`                                              | Predvolene `password`: používateľské meno a heslo bez SMTP. Voliteľne `email` alebo `both`.                                                                                                                       |
+| `BOOTSTRAP_ADMIN_EMAIL`                                  | Voliteľná súkromná adresa prvého admina pri vytvorení cez CLI; zároveň bootstrap e-mail v režime `email`/`both`. Heslové prihlásenie ju nevyžaduje.                                                               |
+| `REGISTRATION_OPEN`                                      | Predvolene otvorené; `false` zastaví nové heslové registrácie vrátane pozvánok.                                                                                                                                   |
+| `COURSE_ID`                                              | Identifikátor ročníka, predvolene `cestou-zimy`. Nemeniť pri bežnom reštarte.                                                                                                                                     |
+| `AUTH_MAIL_MODE`                                         | Pre produkčné e-maily `smtp`. `AUTH_MODE=password` e-maily nevyžaduje. Vývojové `file` sa v produkcii odmieta.                                                                                                    |
+| `SMTP_HOST`, `SMTP_PORT`                                 | Existujúci SMTP server a port, zvyčajne 587.                                                                                                                                                                      |
+| `SMTP_SECURE`                                            | `true` pre implicitné TLS na 465; pre 587 `false` s STARTTLS.                                                                                                                                                     |
+| `SMTP_USER`, `SMTP_PASSWORD`                             | SMTP prihlasovanie; možno vynechať iba pri úmyselne nakonfigurovanom dôveryhodnom relayi.                                                                                                                         |
+| `MAIL_FROM`                                              | Overená adresa/odosielateľ povolený poskytovateľom SMTP.                                                                                                                                                          |
+| `TRUST_PROXY`                                            | `1` iba za priloženým Caddy smerovaním, ktoré prepíše `X-Real-IP`; server nesmie byť dostupný priamo z internetu.                                                                                                 |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Voliteľný web push; private key zostáva na serveri, subject je kontaktná `mailto:` alebo HTTPS adresa. Bez konfigurácie sa zapnutie push nepovažuje za úspešné.                                                   |
+| `DATABASE_PATH`, `HOST`, `PORT`, `NODE_ENV`              | Compose nastavuje `/data/cestou-zimy.sqlite`, `0.0.0.0`, `3000`, `production`.                                                                                                                                    |
 
 Ak zapneš `AUTH_MODE=email` alebo `both`, produkčné SMTP treba otestovať skutočným prijatím OTP e-mailu, expiráciou, opätovným odoslaním a prihlásením pozvaného účastníka. Pre `AUTH_MODE=password` tento krok nie je potrebný a nie je nutné na Hube inštalovať mailový server. Over SPF/DKIM/DMARC podľa existujúceho poskytovateľa. Neodosielaj skutočné pozvánky počas testovania bez zámeru organizátora.
 
@@ -79,6 +79,14 @@ AUTH_MODE=password
 COURSE_ID=cestou-zimy
 TRUST_PROXY=1
 ```
+
+Pred prvým `docker compose run` vytvor samostatný host adresár pre zálohy. Compose ho zámerne nevytvára automaticky:
+
+```sh
+sudo install -d -m 0700 -o 1000 -g 1000 /srv/cestou-zimy-backups
+```
+
+Ak v `zk.env` zvolíš inú hodnotu `BACKUP_HOST_PATH`, vytvor týmto spôsobom daný adresár. Musí byť mimo živého dátového volume a zapisovateľný pre UID/GID 1000. Ďalšie možnosti sú v časti **Zálohovanie a obnova** nižšie.
 
 Najprv over sieť a zostav iba nový image. Build potrebuje `APP_URL`; prihlasovacie tajomstvo v tejto chvíli ešte netreba:
 
@@ -111,7 +119,7 @@ CLI si vypýta zvolenú prezývku organizátora, skryté heslo a jeho potvrdenie
 
 Ak sieť `inventory-hub-net` neexistuje alebo v nej nie je Caddy, najprv porovnaj skutočnú konfiguráciu servera. Nevytváraj ďalšiu rovnako vyzerajúcu sieť a neprepájaj Hub naslepo. Nový Compose projekt má vlastný volume `cestou-zimy_zk_data`, SQLite aj účty sú oddelené od Hub PostgreSQL a SPS.
 
-Kontajner beží ako neprivilegovaný používateľ, root filesystem je read-only a zapisuje iba do `/data` a dočasného `/tmp`. Prvý named volume zdedí vlastníka UID 1000; pri ručnom importe volume oprav vlastníctvo pre UID/GID 1000. V produkcii spúšťaj **jednu repliku** tejto aplikácie. Nezdieľaj SQLite súbor cez NFS ani medzi nezávislými kontajnermi.
+Kontajner beží ako neprivilegovaný používateľ, root filesystem je read-only a zapisuje iba do `/data`, samostatného `/backups` a dočasného `/tmp`. Prvý named volume zdedí vlastníka UID 1000; pri ručnom importe volume oprav vlastníctvo pre UID/GID 1000. V produkcii spúšťaj **jednu repliku** tejto aplikácie. Nezdieľaj SQLite súbor cez NFS ani medzi nezávislými kontajnermi.
 
 ### Prvý organizátor
 
@@ -141,6 +149,7 @@ Toto je krok autorizovaného prvého nasadenia na Hub do existujúcej produkčne
    ```
 
    Ak výstup prvého kroku ukáže inú cestu, použi skutočný mount. Kandidát ostáva mimo repozitára.
+
 3. Vytvor reviewovateľný fragment:
 
    ```sh
@@ -148,6 +157,7 @@ Toto je krok autorizovaného prvého nasadenia na Hub do existujúcej produkčne
    ```
 
    Skript podľa `APP_URL` vyberie prvotný Hub fragment, samostatný site pre subdoménu alebo alternatívny fragment pre verejnú proxy. Prázdnu, cudziu alebo neplatnú URL odmietne. Iba vypíše lokálnu konfiguráciu, nemení server a nepotrebuje `ZK_DOMAIN`. V tomto prvom nasadení je `APP_URL=https://hub.biketrek.sk/zk`.
+
 4. Pri prvom Hub nasadení vlož do `/tmp/Caddyfile.zk-candidate` celý **vygenerovaný** fragment z `deploy/Caddyfile.zk` **dovnútra existujúceho `hub.biketrek.sk { ... }`**, pred fallback `handle`, ktorý obsluhuje Hub SPA. Zachovaj `/sps`, `/api`, `/data` a ostatné routes. Subdoménový variant je celý samostatný site a sem sa nevkladá; jeho postup je nižšie. Ilustračný diff:
 
    ```diff
@@ -166,6 +176,7 @@ Toto je krok autorizovaného prvého nasadenia na Hub do existujúcej produkčne
    ```
 
    Použi celý vygenerovaný fragment, nie skrátený diff. Prvý režim prefix zachová, druhý regexom prepíše iba `/zk` na `/priprava`; query ostáva zachované. `/sps/*`, `/api/*`, `/data/*`, `/zk-other` sa neodchytávajú. Nepoužívaj samotné `handle_path /zk/*`, pretože aplikácia potrebuje aktívny prefix. Pri presune existujúci ZK blok **nahraď**, nepridávaj druhý rovnaký matcher.
+
 5. Skopíruj kandidáta do kontajnera ako `/tmp/Caddyfile.zk-candidate` a validuj:
 
    ```sh
@@ -214,6 +225,7 @@ Tento presun sa vykoná až s prístupom k DNS a autorizáciou zmeny. Nevyžaduj
    ```
 
    Premenná `zk_caddy_source` pochádza z overeného mountu v tej istej SSH relácii. Počas krátkeho prepnutia stará stránka nemusí fungovať; otvor novú adresu. Samotné `caddy validate` ešte nepotvrdzuje úspešné vydanie verejného TLS certifikátu.
+
 6. Over `https://priprava.zimnykurz.sk/`: TLS, prihlásenie pôvodným účtom, záznam aktivity, reload, API, manifest a service worker s koreňovým scope `/`. Cookie je host-only s `Path=/`; neposiela sa na hlavný web. Staré `https://hub.biketrek.sk/zk` musí presmerovať a Hub/SPS musia fungovať ďalej. Účty, heslá, členstvo aj aktivity zostávajú v rovnakom volume. Na novej doméne sa účastník znovu prihlási a vedome povolí push; starú PWA nahradí novou.
 
 Pre návrat zmeň `APP_URL` späť na `https://hub.biketrek.sk/zk`, rebuildni a reštartuj iba ZK a obnov predchádzajúci overený Caddyfile cez kandidáta a validáciu. Samotný presun ani návrat neobnovuje databázu zo zálohy a nikdy nepoužíva `down -v` ani nové meno Compose projektu. DNS nového názvu možno ponechať do vyriešenia problému; hlavný web sa nemení.
@@ -296,23 +308,57 @@ Tieto príkazy sa týkajú iba ZK stacku. Bežná aktualizácia nemení Caddy an
 
 ## Zálohovanie a obnova
 
-`scripts/backup.mjs` používa SQLite online backup API, takže zahrnie aj necheckpointované WAL zápisy. Výsledok skontroluje cez `PRAGMA integrity_check` a nastaví oprávnenia 0600. Nekopíruj len živý `.sqlite` súbor, pretože aktuálne dáta môžu byť vo WAL.
+Záloha obsahuje konzistentnú SQLite databázu, všetky referencované fotografie/avatary/obrázky ocenení a manifest s SHA-256 kontrolnými súčtami. `scripts/backup.mjs` používa SQLite online backup API (vrátane committed WAL zápisov), overí `PRAGMA integrity_check` a oprávnenia nastaví na 0600. Finálny manifest vznikne až po úspešnej kontrole všetkých súborov.
+
+### Pred prvým nasadením tejto verzie
+
+Nový Compose používa samostatný host bind `/backups`, mimo volume so živými údajmi. **Najprv vytvor host adresár**, inak Compose zámerne odmietne štart (nevytvára ho ako root). Default:
+
+```sh
+sudo install -d -m 0700 -o 1000 -g 1000 /srv/cestou-zimy-backups
+```
+
+Pre inú cestu nastav `BACKUP_HOST_PATH` v `zk.env`; adresár musí byť zapisovateľný používateľom 1000:1000. Neumiestňuj ho do živého dátového volume. Pri aktualizácii starej verzie najprv použi jej existujúci zálohovací postup a skopíruj výsledok mimo živého volume; až potom aktualizuj Compose a obraz.
+
+### Denná záloha
+
+V produkcii beží predvolene vnútorný plánovač o **03:15 v časovom pásme kurzu**. `BACKUP_TIME` mení čas, `BACKUP_RETENTION=30` uchováva 30 úspešných denných verzií. Neúplná záloha nevytlačí staršiu úspešnú a denná retencia neodstraňuje manuálne ani predštartové snapshoty. `BACKUP_TIMEZONE` môže výslovne zmeniť časové pásmo; bežne ho nechaj prázdne.
+
+Ak na hostiteľovi už existuje cron alebo systemd timer, nastav `BACKUP_SCHEDULER=external` alebo vytvor `/backups/.external-scheduler`. Aplikácia potom nevytvorí druhý denný job. Existujúci host scheduler použi s príkazom `node scripts/backup.mjs --daily`. `off` plánovač vypne; vo vývoji je predvolene vypnutý. Pre bežné produkčné nasadenie zvoľ presne jeden plánovač.
+
+Manuálna záloha:
 
 ```sh
 docker compose --env-file zk.env -p cestou-zimy exec -T zk-app node scripts/backup.mjs
 ```
 
-Skript vypíše presnú cestu `/data/backups/...sqlite`. Prenes tento súbor cez `docker compose --env-file zk.env -p cestou-zimy cp zk-app:/data/backups/KONKRETNY_SUBOR.sqlite /BEZPECNA/CESTA/` aj mimo server. Záloha v rovnakom volume chráni pred chybnou zmenou, nie pred stratou servera. SQLite obsahuje členov, súkromné zápisy, účty a push subscription; zálohu chráň ako osobné údaje. Oddelene zálohuj `zk.env` a chráň ho pred prístupom nepovolaných osôb. Naplánovanie a retenčnú politiku nastavuje prevádzkovateľ; nič sa tu automaticky neodosiela tretej strane.
+Uchovaj spolu celú trojicu:
 
-Pred obnovou musí byť aplikácia zastavená. Vopred skopíruj zvolenú zálohu do `/data/backups/`:
+- `/backups/IDENTIFIKATOR.sqlite` — databáza,
+- `/backups/IDENTIFIKATOR.sqlite.assets/` — fotografie a obrázky,
+- `/backups/IDENTIFIKATOR.sqlite.manifest.json` — dokončený manifest a kontrolné súčty.
+
+Tieto súbory sú priamo v zvolenom host adresári. Pri kopírovaní mimo server prenes všetky tri položky. Záloha na rovnakom fyzickom disku nechráni pred jeho stratou; off-site kópiu nastavuje prevádzkovateľ samostatne. Chráň aj `zk.env`, ktorý obsahuje runtime tajomstvá. Aplikácia neodosiela zálohy cudzej službe.
+
+### Obnova
+
+Najprv zastav aplikáciu. Zvolenú trojicu zálohy umiestni do zálohovacieho host adresára a potom:
 
 ```sh
 docker compose --env-file zk.env -p cestou-zimy stop zk-app
-docker compose --env-file zk.env -p cestou-zimy run --rm --no-deps zk-app node scripts/restore.mjs /data/backups/KONKRETNY_SUBOR.sqlite --confirm-stopped
+docker compose --env-file zk.env -p cestou-zimy run --rm --no-deps zk-app node scripts/restore.mjs /backups/IDENTIFIKATOR.sqlite --confirm-stopped
 docker compose --env-file zk.env -p cestou-zimy up -d --no-deps zk-app
 ```
 
-Obnova najprv skontroluje integritu a tabuľku `courses`, zachová predchádzajúcu databázu ako `*.before-restore-*`, pripraví nový súbor a až potom ho vymení. Argument `--confirm-stopped` nie je automatická detekcia kontajnera: prevádzkovateľ zodpovedá za predchádzajúce zastavenie servera. Obnova nesmie bežať súbežne s aplikáciou. Test obnovy v samostatnom prostredí je súčasťou prevádzkového overenia.
+Obnova overí integritu aj hashe fotografií, pripraví nové súbory, zachová predchádzajúcu databázu a médiá ako vlastný snapshot a úspešne checkpointne pôvodné committed WAL dáta. Až potom nahrádza súbory. Chýbajúca alebo poškodená fotografia obnovu zastaví. Staršiu zálohu bez manifestu možno obnoviť iba vtedy, keď neobsahuje odkazy na médiá.
+
+`--confirm-stopped` potvrdzuje krok obsluhy; nevyhľadáva a nezastavuje kontajnery. Obnova nesmie bežať súbežne s aplikáciou. Prevádzkový test obnovy rob v oddelenom adresári/volume, nie nad aktuálnymi dátami.
+
+### Spustenie novej prípravy
+
+Nasadenie ani migrácia prípravu nespúšťa. Túto operáciu vyvolá organizátor v **Administrácia → Rozšírené nastavenia → Spustiť prípravu na zimný kurz**. Zadá explicitný začiatok/koniec prípravy a hlavnej udalosti, prezrie presné počty odstraňovaných údajov a potvrdí text `SPUSTIŤ PRÍPRAVU`.
+
+Server bez úspešnej úplnej zálohy pokračovanie odmietne. Náhľad platí desať minút; zmena údajov ho zneplatní aj počas tvorby zálohy. Výmaz a nastavenie nového obdobia sú atómové, fyzické mazanie nepoužívaných médií nasleduje až po commite. Podrobnosti o účtoch a zachovaných šablónach sú v [sprievodcovi organizátora](ADMINISTRATOR.md).
 
 ## Čo overiť pred pozvaním účastníkov
 
@@ -320,7 +366,7 @@ Obnova najprv skontroluje integritu a tabuľku `courses`, zachová predchádzaj�
 - Aktívne `APP_URL` sa zhoduje s buildom aj Caddy konfiguráciou; platné TLS, správny Host/Origin, Secure/HttpOnly cookie a service worker scope používajú aktívny prefix `/zk`, `/priprava` alebo koreň `/` na samostatnej subdoméne.
 - Login limity pre dvoch účastníkov, aj po podvrhnutí klientského `X-Forwarded-For` (nesmie obísť limit); pri budúcej verejnej proxy osobitne overené jej IP forwarding pravidlá.
 - Prvý admin sa prihlási účtom vytvoreným cez serverové CLI. Verejná registrácia bez pozvánky čaká na schválenie, platná pozvánka aktivuje iba účastníka a odobratý člen stratí prístup aj so starou session. Prístup organizátora sa neprideľuje registráciou.
-- Testovací ročník je označený, termíny prípravy sú nastavené pre skutočný kurz a demo dáta sa nezmiešajú s účastníkmi.
+- Ročník a dátumy zodpovedajú skutočnej príprave. Migrácia zachovala doterajšie údaje; nový štart sa vykoná až po vedomom potvrdení organizátora. Demo údaje používajú samostatnú databázu.
 - Heslové prihlásenie, zotrvanie session po zatvorení/otvorení na PC aj mobile, platnosť a počet použití pozvánok aj jednorazová obnova hesla vrátane zrušenia starých session. Pri voliteľnom e-mailovom režime navyše reálny SMTP login, pozvánka, opätovné odoslanie a expirácia; vývojová schránka nie je dôkaz doručenia e-mailu.
 - Reálny web push na cieľovom Android/iPhone, odmietnutie, odhlásenie a otvorenie správnej správy. Na iPhone/iPade môže byť potrebná inštalácia na plochu a podporovaná verzia systému.
 - Reštart kontajnera ponechá aktivity, reakcie, komentáre a oznámenia. Over zálohu/obnovu.

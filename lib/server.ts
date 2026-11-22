@@ -24,7 +24,33 @@ import {
   normalizeApplicationUrl,
   type SendResult,
 } from "./push.ts";
-export interface ServerConfig {
+import {
+  CommunityError,
+  seedCommunity,
+  communityAction,
+  getColdState,
+  getColdEntries,
+  getPersonalAwards,
+  getMottos,
+  dailyMotto,
+  isColdChallenge,
+  visibleChallenge,
+  parseVisual,
+  visualStatements,
+} from "./community.ts";
+import {
+  preparationAction,
+  courseMetadata,
+  type PreparationHooks,
+} from "./season.ts";
+import {
+  MediaError,
+  listActivityMedia,
+  memberAvatarUrl,
+  prepareActivityMedia,
+} from "../server/media.ts";
+import { basePathFromUrl, APP_BASE_PATH } from "./paths.ts";
+export interface ServerConfig extends PreparationHooks {
   courseId?: string;
   bootstrapAdminEmail?: string;
   now?: () => Date;
@@ -35,6 +61,7 @@ export interface ServerConfig {
   emailApiKey?: string;
   emailFrom?: string;
   emailEnabled?: boolean;
+  mediaDirectory?: string;
   invitationSender?: (payload: {
     to: string;
     nickname: string;
@@ -197,9 +224,16 @@ export async function bootstrap(
       month: "2-digit",
       day: "2-digit",
     }).format(new Date(now));
+  const courseYear =
+    Number(today.slice(0, 4)) + (Number(today.slice(5, 7)) >= 7 ? 1 : 0);
   const course: Course = {
     id: cid,
-    name: "Cestou Zimy · testovací ročník",
+    name: `Cestou Zimy ${courseYear}`,
+    year: courseYear,
+    ...(courseYear === 2027
+      ? { eventStartDate: "2027-02-03", eventEndDate: "2027-02-07" }
+      : {}),
+    coldUnlockDay: 8,
     startDate: addDays(weekStart(today), -28),
     endDate: addDays(weekStart(today), 55),
     timezone: "Europe/Bratislava",
@@ -254,7 +288,7 @@ export async function bootstrap(
   for (const [key, name, description] of [
     [
       "cold",
-      "Studená sprcha",
+      "Studená sprcha alebo otužovanie",
       "Dobrovoľne si vyskúšaj krátku chladnejšiu sprchu podľa vlastného komfortu. Bez merania času a bez prekonávania hraníc.",
     ],
     [
@@ -276,6 +310,16 @@ export async function bootstrap(
       typeId: cid + "-" + key,
       createdAt: now,
       publishedAt: null,
+      ...(key === "cold"
+        ? {
+            kind: "cold" as const,
+            visual: {
+              kind: "icon" as const,
+              value: "snowflake",
+              color: "#5eb7db",
+            },
+          }
+        : {}),
     };
     statements.push(
       db
@@ -350,12 +394,13 @@ async function authenticate(
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(now));
+  await seedCommunity(db, course, now);
   return { me: member(r, true), course, today, now };
 }
 async function getActivities(db: Database, cid: string): Promise<Activity[]> {
   const data = await rows(
     db,
-    `SELECT a.*,t.name type_name,t.group_name,m.nickname FROM activities a JOIN activity_types t ON t.id=a.type_id JOIN members m ON m.id=a.member_id WHERE a.course_id=? AND t.hidden=0 AND m.active=1 ORDER BY a.date DESC,a.created_at DESC`,
+    `SELECT a.*,t.name type_name,t.group_name,m.nickname FROM activities a JOIN activity_types t ON t.id=a.type_id JOIN members m ON m.id=a.member_id WHERE a.course_id=? AND t.hidden=0 AND t.id<>t.course_id||'-cold' AND COALESCE(t.challenge_id,'')<>t.course_id||'-cold' AND m.active=1 ORDER BY a.date DESC,a.created_at DESC`,
     cid,
   );
   return data.map((a) => ({
@@ -531,6 +576,7 @@ async function getAwards(
       gem: snapshot.gem,
       earnedAt: a.earned_at,
       snapshot,
+      visual: snapshot.visual,
     };
   });
 }
@@ -617,13 +663,20 @@ export async function handleRequest(
     }
     const { me, course, today, now } = await authenticate(db, identity, cfg);
     const cid = course.id;
+    let basePath = APP_BASE_PATH;
+    try {
+      if (cfg.siteUrl) basePath = basePathFromUrl(cfg.siteUrl);
+    } catch {
+      /* A stale deployment URL must not break account recovery. */
+    }
+    me.avatarUrl = await memberAvatarUrl(db, cid, me.id, basePath);
     if (path === "/api/state" && request.method === "GET") {
       const [activities, types, members, rules, challengeRows, messageRows] =
         await Promise.all([
           getActivities(db, cid),
           rows(
             db,
-            "SELECT * FROM activity_types WHERE course_id=? AND hidden=0",
+            "SELECT * FROM activity_types WHERE course_id=? AND hidden=0 AND id<>course_id||'-cold' AND COALESCE(challenge_id,'')<>course_id||'-cold'",
             cid,
           ),
           rows(
@@ -639,7 +692,7 @@ export async function handleRequest(
           ),
           rows(
             db,
-            "SELECT m.data,m.sent_at,r.read_at FROM messages m JOIN recipients r ON r.message_id=m.id WHERE m.course_id=? AND r.member_id=? AND m.status='sent' ORDER BY m.sent_at DESC",
+            "SELECT m.data,m.sent_at,r.read_at,r.archived_at,r.acknowledged_at FROM messages m JOIN recipients r ON r.message_id=m.id WHERE m.course_id=? AND r.member_id=? AND m.status='sent' ORDER BY m.sent_at DESC",
             cid,
             me.id,
           ),
@@ -664,6 +717,7 @@ export async function handleRequest(
         getAwards(db, cid),
       ]);
       for (const a of activities) {
+        a.photos = await listActivityMedia(db, cid, a.id, basePath);
         a.comments = comments
           .filter((c) => c.activity_id === a.id)
           .map((c) => ({
@@ -678,42 +732,100 @@ export async function handleRequest(
           .filter((r) => r.activity_id === a.id)
           .map((r) => r.member_id);
       }
-      const challenges = challengeRows.map((r) => {
-        const ch: Challenge = JSON.parse(r.data),
-          ownCompletions = completions.filter(
-            (c) =>
-              c.challenge_id === ch.id &&
-              c.date >= ch.startDate &&
-              c.date <= ch.endDate,
+      const challenges = challengeRows
+        .filter((r) => {
+          const ch: Challenge = JSON.parse(r.data);
+          return (
+            visibleChallenge(ch, course, today) && !isColdChallenge(ch, cid)
           );
-        const progress = evaluateCondition(
-          ch.condition,
-          activities.filter(
-            (a) =>
-              a.memberId === me.id &&
-              a.date >= ch.startDate &&
-              a.date <= ch.endDate,
-          ),
-          ownCompletions.length,
-        );
-        return {
-          ...ch,
-          manualCompleted: ownCompletions.length > 0,
-          completion: ownCompletions[0]
-            ? { date: ownCompletions[0].date, note: ownCompletions[0].note }
-            : null,
-          completed: progress.complete,
-          progress,
-        };
-      });
-      const messages = messageRows.map((r) => {
-        const { recipients: _, push: __, ...m } = JSON.parse(r.data);
-        return { ...m, sentAt: r.sent_at, readAt: r.read_at, status: "sent" };
-      });
+        })
+        .map((r) => {
+          const ch: Challenge = JSON.parse(r.data),
+            ownCompletions = completions.filter(
+              (c) =>
+                c.challenge_id === ch.id &&
+                c.date >= ch.startDate &&
+                c.date <= ch.endDate,
+            );
+          const progress = evaluateCondition(
+            ch.condition,
+            activities.filter(
+              (a) =>
+                a.memberId === me.id &&
+                a.date >= ch.startDate &&
+                a.date <= ch.endDate,
+            ),
+            ownCompletions.length,
+          );
+          return {
+            ...ch,
+            manualCompleted: ownCompletions.length > 0,
+            completion: ownCompletions[0]
+              ? { date: ownCompletions[0].date, note: ownCompletions[0].note }
+              : null,
+            completed: progress.complete,
+            progress,
+          };
+        });
+      const messages = messageRows
+        .filter(
+          (r) =>
+            me.role === "admin" ||
+            JSON.parse(r.data).kind !== "membership_request",
+        )
+        .map((r) => {
+          const { recipients: _, push: __, ...m } = JSON.parse(r.data);
+          return {
+            ...m,
+            sentAt: r.sent_at,
+            readAt: r.read_at,
+            archivedAt: r.archived_at,
+            acknowledgedAt: r.acknowledged_at,
+            status: "sent",
+          };
+        });
+      const [cold, personal, motto, stateMembers] = await Promise.all([
+        getColdState(db, course, me, today),
+        getPersonalAwards(db, cid, false, basePath),
+        dailyMotto(db, course, today),
+        Promise.all(
+          members.map(async (r) => ({
+            ...member(r),
+            avatarUrl: await memberAvatarUrl(db, cid, r.id, basePath),
+          })),
+        ),
+      ]);
+      for (const reward of [
+        ...awards,
+        ...rules.map((p) => p.rule),
+        ...challenges,
+      ]) {
+        if (reward.visual?.kind === "image")
+          reward.visual = {
+            ...reward.visual,
+            url: `${basePath}/api/media/${encodeURIComponent(reward.visual.value)}`,
+          };
+      }
       return json({
         course,
         me,
-        members: members.map((r) => member(r)),
+        members: stateMembers,
+        cold,
+        ...personal,
+        motto,
+        ...(me.role === "admin"
+          ? {
+              pendingAccounts: Number(
+                (
+                  await one(
+                    db,
+                    "SELECT COUNT(*) count FROM membership_requests WHERE course_id=? AND status='pending'",
+                    cid,
+                  )
+                ).count,
+              ),
+            }
+          : {}),
         types: types.map(typeRow),
         activities,
         rules,
@@ -759,7 +871,89 @@ export async function handleRequest(
             cid,
           ),
         ]);
+      const [
+        personal,
+        coldEntries,
+        mottos,
+        reportingActivities,
+        allAwards,
+        allCompletions,
+      ] = await Promise.all([
+        getPersonalAwards(db, cid, true, basePath),
+        getColdEntries(db, cid, false),
+        getMottos(db, cid),
+        rows(
+          db,
+          "SELECT a.*,m.nickname,t.name type_name,t.group_name FROM activities a JOIN members m ON m.id=a.member_id AND m.course_id=a.course_id JOIN activity_types t ON t.id=a.type_id AND t.course_id=a.course_id WHERE a.course_id=? AND t.group_name<>'task' ORDER BY a.date,a.id",
+          cid,
+        ),
+        rows(db, "SELECT * FROM awards WHERE course_id=?", cid),
+        rows(db, "SELECT * FROM completions WHERE course_id=?", cid),
+      ]);
+      const reportActivities = await Promise.all(
+        reportingActivities.map(async (a) => ({
+          id: a.id,
+          courseId: a.course_id,
+          memberId: a.member_id,
+          typeId: a.type_id,
+          date: a.date,
+          minutes: a.minutes,
+          distance: a.distance,
+          note: a.note,
+          createdAt: a.created_at,
+          updatedAt: a.updated_at,
+          group: a.group_name,
+          typeName: a.type_name,
+          nickname: a.nickname,
+          photos: await listActivityMedia(db, cid, a.id, basePath),
+        })),
+      );
+      const reportAwards = allAwards.map((a) => {
+        const snapshot = JSON.parse(a.snapshot);
+        return {
+          id: a.id,
+          memberId: a.member_id,
+          ruleKey: a.rule_key,
+          periodStart: a.period_start,
+          periodEnd: a.period_end,
+          ruleVersion: a.rule_version,
+          name: snapshot.name,
+          gem: snapshot.gem,
+          visual: snapshot.visual,
+          earnedAt: a.earned_at,
+          snapshot,
+        };
+      });
+      const reportCompletions = allCompletions
+        .filter((c) => c.challenge_id !== cid + "-cold")
+        .map((c) => ({
+          id: c.id,
+          memberId: c.member_id,
+          challengeId: c.challenge_id,
+          date: c.date,
+          note: c.note,
+          name:
+            c.challenge_id === "gear"
+              ? "Výbava"
+              : JSON.parse(
+                  challenges.find(
+                    (ch) => JSON.parse(ch.data).id === c.challenge_id,
+                  )?.data || "{}",
+                ).name,
+        }));
       return json({
+        course,
+        ...personal,
+        coldEntries,
+        mottos,
+        reporting: {
+          activities: reportActivities,
+          members: members.map((r) => member(r, true)),
+          awards: reportAwards,
+          completions: reportCompletions,
+          coldEntries,
+          personalAwards: personal.personalAwards,
+        },
         members: members.map((r) => member(r, true)),
         types: types.map(typeRow),
         rules,
@@ -1100,6 +1294,10 @@ export async function handleRequest(
     ];
     if (adminActions.includes(action) && me.role !== "admin")
       fail(403, "Túto zmenu môže spraviť iba organizátor.");
+    const extension =
+      (await communityAction(db, course, me, today, now, action, b)) ??
+      (await preparationAction(db, course, me, today, now, action, b, cfg));
+    if (extension !== null) return json({ ok: true, ...extension });
     let result: Record<string, unknown> = {};
     switch (action) {
       case "saveActivity": {
@@ -1124,46 +1322,51 @@ export async function handleRequest(
           distance = numeric(b.distance, 1000, true),
           note = str(b.note),
           key = required(b.idempotencyKey, 100);
-        if (old) {
-          await run(
+        const prior =
+          old ||
+          (await one(
             db,
-            "UPDATE activities SET type_id=?,date=?,minutes=?,distance=?,note=?,updated_at=? WHERE id=?",
-            t.id,
-            d,
-            minutes,
-            distance,
-            note,
-            now,
-            old.id,
-          );
-          result.id = old.id;
-        } else {
-          const id = uid();
-          await run(
-            db,
-            "INSERT OR IGNORE INTO activities(id,course_id,member_id,type_id,date,minutes,distance,note,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            id,
+            "SELECT id FROM activities WHERE course_id=? AND member_id=? AND idempotency_key=?",
             cid,
             me.id,
-            t.id,
-            d,
-            minutes,
-            distance,
-            note,
-            now,
-            now,
             key,
-          );
-          result.id = (
-            await one(
-              db,
-              "SELECT id FROM activities WHERE course_id=? AND member_id=? AND idempotency_key=?",
-              cid,
-              me.id,
-              key,
-            )
-          )?.id;
-        }
+          ));
+        const activityId = prior?.id || uid();
+        const mediaStatements =
+          b.photoIds !== undefined
+            ? await prepareActivityMedia(
+                db,
+                cid,
+                me,
+                activityId,
+                z.array(z.string()).max(5).parse(b.photoIds),
+              )
+            : [];
+        const activityStatement = old
+          ? db
+              .prepare(
+                "UPDATE activities SET type_id=?,date=?,minutes=?,distance=?,note=?,updated_at=? WHERE id=? AND course_id=? AND member_id=?",
+              )
+              .bind(t.id, d, minutes, distance, note, now, old.id, cid, me.id)
+          : db
+              .prepare(
+                "INSERT OR IGNORE INTO activities(id,course_id,member_id,type_id,date,minutes,distance,note,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+              )
+              .bind(
+                activityId,
+                cid,
+                me.id,
+                t.id,
+                d,
+                minutes,
+                distance,
+                note,
+                now,
+                now,
+                key,
+              );
+        await db.batch([activityStatement, ...mediaStatements]);
+        result.id = activityId;
         await recalculate(db, course, me.id, today, now);
         break;
       }
@@ -1172,6 +1375,11 @@ export async function handleRequest(
         await db.batch([
           db.prepare("DELETE FROM comments WHERE activity_id=?").bind(a.id),
           db.prepare("DELETE FROM reactions WHERE activity_id=?").bind(a.id),
+          db
+            .prepare(
+              "DELETE FROM media WHERE course_id=? AND kind='activity' AND resource_id=?",
+            )
+            .bind(cid, a.id),
           db.prepare("DELETE FROM activities WHERE id=?").bind(a.id),
         ]);
         await recalculate(db, course, a.member_id, today, now);
@@ -1260,6 +1468,11 @@ export async function handleRequest(
           );
           if (!r) fail(404, "Výzva sa nenašla.");
           const c: Challenge = JSON.parse(r.data);
+          if (isColdChallenge(c, cid))
+            fail(
+              400,
+              "Studenú sprchu alebo otužovanie zapisuj samostatne v prehľade výzvy.",
+            );
           if (!hasManual(c.condition))
             fail(400, "Táto výzva sa počíta z aktivít.");
           start = c.startDate;
@@ -1300,7 +1513,20 @@ export async function handleRequest(
           me.id,
         );
         break;
-      case "readMessage":
+      case "readMessage": {
+        const recipient = await one(
+          db,
+          "SELECT m.data FROM recipients r JOIN messages m ON m.id=r.message_id WHERE r.message_id=? AND r.member_id=? AND m.course_id=? AND m.status='sent'",
+          required(b.id),
+          me.id,
+          cid,
+        );
+        if (
+          !recipient ||
+          (JSON.parse(recipient.data).kind === "membership_request" &&
+            me.role !== "admin")
+        )
+          fail(404, "Správa sa nenašla.");
         await run(
           db,
           "UPDATE recipients SET read_at=COALESCE(read_at,?) WHERE message_id=? AND member_id=?",
@@ -1309,6 +1535,7 @@ export async function handleRequest(
           me.id,
         );
         break;
+      }
       case "pushStatus": {
         const subscription = await one(
             db,
@@ -1386,15 +1613,23 @@ export async function handleRequest(
         );
         break;
       case "saveCourse": {
-        const next: Course = {
-          ...course,
-          name: required(b.name),
-          startDate: date(b.startDate),
-          endDate: date(b.endDate),
-          timezone: required(b.timezone, 60),
-          squirrelLimit: z.number().int().min(0).max(5).parse(b.squirrelLimit),
-          testMode: bool(b.testMode),
-        };
+        const next: Course = courseMetadata(
+          {
+            ...course,
+            name: required(b.name),
+            startDate: date(b.startDate),
+            endDate: date(b.endDate),
+            timezone: required(b.timezone, 60),
+            squirrelLimit: z
+              .number()
+              .int()
+              .min(0)
+              .max(5)
+              .parse(b.squirrelLimit),
+            testMode: bool(b.testMode),
+          },
+          b,
+        );
         try {
           new Intl.DateTimeFormat("en-CA", { timeZone: next.timezone });
         } catch {
@@ -1411,7 +1646,9 @@ export async function handleRequest(
         const history = (
           await one(
             db,
-            "SELECT (SELECT COUNT(*) FROM activities WHERE course_id=?) + (SELECT COUNT(*) FROM awards WHERE course_id=?) + (SELECT COUNT(*) FROM completions WHERE course_id=?) count",
+            "SELECT (SELECT COUNT(*) FROM activities WHERE course_id=?) + (SELECT COUNT(*) FROM awards WHERE course_id=?) + (SELECT COUNT(*) FROM completions WHERE course_id=?) + (SELECT COUNT(*) FROM cold_entries WHERE course_id=?) + (SELECT COUNT(*) FROM personal_award_grants WHERE course_id=?) count",
+            cid,
+            cid,
             cid,
             cid,
             cid,
@@ -1434,7 +1671,17 @@ export async function handleRequest(
             next.endDate,
           )
         ).count;
-        if (outside)
+        const coldOutside = await one(
+          db,
+          "SELECT (SELECT COUNT(*) FROM cold_entries WHERE course_id=? AND (date<? OR date>?)) + (SELECT COUNT(*) FROM personal_award_grants WHERE course_id=? AND (date<? OR date>?)) count",
+          cid,
+          next.startDate,
+          next.endDate,
+          cid,
+          next.startDate,
+          next.endDate,
+        );
+        if (outside || coldOutside.count)
           fail(
             409,
             "Existujú aktivity alebo potvrdené úlohy mimo nového obdobia. Najprv oprav ich dátumy.",
@@ -1685,7 +1932,15 @@ export async function handleRequest(
           gem: required(b.gem, 40),
           condition,
           active: bool(b.active),
+          ...(b.visual !== undefined ? { visual: parseVisual(b.visual) } : {}),
         };
+        const ruleMedia = await visualStatements(
+          db,
+          cid,
+          next.key,
+          next.visual,
+        );
+        if (ruleMedia.length) await db.batch(ruleMedia);
         await run(
           db,
           "INSERT INTO rules(id,course_id,key,version,effective_from,data) VALUES(?,?,?,?,?,?)",
@@ -1947,7 +2202,20 @@ export async function handleRequest(
           typeId: prior?.typeId || null,
           createdAt: prior?.createdAt || now,
           publishedAt: null,
+          ...(prior?.kind ? { kind: prior.kind } : {}),
+          ...(b.visual !== undefined
+            ? { visual: parseVisual(b.visual) }
+            : prior?.visual
+              ? { visual: prior.visual }
+              : {}),
         };
+        const challengeMedia = await visualStatements(
+          db,
+          cid,
+          ch.id,
+          ch.visual,
+        );
+        if (challengeMedia.length) await db.batch(challengeMedia);
         if (prior)
           await run(
             db,
@@ -2011,7 +2279,12 @@ export async function handleRequest(
               .bind(ch.typeId, cid),
           );
         await db.batch(stmts);
-        if (action === "publishChallenge" && b.announce && !already) {
+        if (
+          action === "publishChallenge" &&
+          b.announce &&
+          !already &&
+          visibleChallenge(ch, course, today)
+        ) {
           const message: Message = {
             id: "challenge-" + ch.id,
             title: "Nová výzva: " + ch.name,
@@ -2035,6 +2308,13 @@ export async function handleRequest(
           );
           await sendMessage(db, message.id, course, now);
         }
+        if (
+          action === "publishChallenge" &&
+          isColdChallenge(ch, cid) &&
+          !visibleChallenge(ch, course, today)
+        )
+          result.warning =
+            "Výzva sa účastníkom zobrazí najskôr od ôsmeho dňa prípravy. Upozornenie sa zatiaľ neodoslalo.";
         await log(db, cid, me.id, action, { id: ch.id }, now);
         break;
       }
@@ -2117,7 +2397,11 @@ export async function handleRequest(
     }
     return json({ ok: true, ...result });
   } catch (error) {
-    if (error instanceof HttpError)
+    if (
+      error instanceof HttpError ||
+      error instanceof CommunityError ||
+      error instanceof MediaError
+    )
       return json({ error: error.message }, error.status);
     if (error instanceof z.ZodError || error instanceof SyntaxError)
       return json({ error: "Skontroluj vyplnené údaje a ich rozsah." }, 400);

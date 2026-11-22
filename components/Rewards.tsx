@@ -11,6 +11,10 @@ const hasManual = (c: Condition): boolean =>
   c.kind === "manual" ||
   (c.kind === "combination" && c.conditions.some(hasManual));
 import { Gem, fmt, Modal, Empty, type Action } from "./ui";
+import AwardArt from "./AwardArt";
+import PersonalAwards from "./PersonalAwards";
+import AwardHistory from "./AwardHistory";
+import ColdPanel from "./ColdPanel";
 export function RuleCard({
   item,
   index,
@@ -29,12 +33,26 @@ export function RuleCard({
     [error, setError] = useState("");
   const p = item.progress,
     r = item.rule;
+  const combination =
+    r.condition.kind === "combination" ? r.condition.conditions : [];
+  const footPart = combination.find(
+    (part) =>
+      part.kind === "activities" &&
+      part.groups?.length === 1 &&
+      part.groups[0] === "foot",
+  );
+  const exercisePart = combination.find(
+    (part) =>
+      part.kind === "activities" &&
+      part.groups?.length === 1 &&
+      part.groups[0] === "exercise",
+  );
   return (
     <article
       className={`reward-card ${p.complete ? "complete" : ""} ${small ? "small-card" : ""}`}
     >
       <div className="reward-title">
-        <Gem earned={p.complete} index={index} />
+        <AwardArt earned={p.complete} visual={r.visual} rewardKey={r.key} />
         <div>
           <span className="eyebrow">
             {r.period === "week" ? "TÝŽDENNÁ ODMENA" : "POČAS PRÍPRAVY"}
@@ -48,6 +66,24 @@ export function RuleCard({
         )}
       </div>
       <p>{r.description}</p>
+      {r.key === "variety" &&
+        combination.length === 2 &&
+        footPart?.kind === "activities" &&
+        exercisePart?.kind === "activities" && (
+          <p className="small muted">
+            Potrebuješ {footPart.count} samostatné zápisy chôdze, turistiky
+            alebo behu
+            {footPart.minMinutes
+              ? ` (aspoň ${footPart.minMinutes} min každý)`
+              : ""}{" "}
+            a {exercisePart.count} zápisy cvičenia
+            {exercisePart.minMinutes
+              ? ` (aspoň ${exercisePart.minMinutes} min každý)`
+              : ""}
+            . Rôzne športy sa nevyžadujú. Aktivity zo skupiny Iné sa do tejto
+            odmeny nepočítajú.
+          </p>
+        )}
       <div className="progress-label">
         <span>{p.complete ? "Podmienka splnená" : p.missing}</span>
         <strong>
@@ -178,7 +214,7 @@ function ChallengeCard({
       <h3>{c.name}</h3>
       <p className="pre-wrap">{c.description}</p>
       <div className="challenge-reward">
-        <Gem earned={!!done} />
+        <AwardArt earned={!!done} visual={c.visual} rewardKey={c.id} />
         <span>
           Bonusová odmena
           <br />
@@ -381,7 +417,7 @@ export default function Rewards({
       r.rule.period === "course",
   );
   const challenges = state.challenges
-    .filter((c) => c.status !== "draft" && !c.hidden)
+    .filter((c) => c.status !== "draft" && !c.hidden && c.kind !== "cold")
     .filter((c) =>
       filter === "all" || filter === "ended"
         ? filter === "all" || c.status === "ended" || c.endDate < state.today
@@ -393,12 +429,13 @@ export default function Rewards({
         <div className="section-head">
           <div>
             <p className="eyebrow">MALÉ CIELE, SKUTOČNÉ ÚSILIE</p>
-            <h2>Tvoja zbierka drahokamov</h2>
+            <h2>Tvoje drahokamy</h2>
           </div>
         </div>
         <p className="section-intro">
-          Päť rôznych ciest. Všetky zvládneš aj s prechádzkami a cvičením doma.
-          Pravidlá sú otvorené a každá aktivita sa započítava automaticky.
+          Päť rôznych ciest. Pod každou odmenou uvidíš presné podmienky aj
+          aktivity, ktoré sa započítali. Pohyb po vlastných znamená chôdzu,
+          turistiku alebo beh; cvičenie tvorí samostatnú skupinu.
         </p>
         <div className="reward-grid">
           {active.map((r, i) => (
@@ -412,6 +449,8 @@ export default function Rewards({
           ))}
         </div>
       </section>
+      <PersonalAwards state={state} onAction={onAction} />
+      {state.cold && <ColdPanel state={state} onAction={onAction} compact />}
       <section>
         <div className="section-head">
           <div>
@@ -447,6 +486,21 @@ export default function Rewards({
             Nové zverejnené výzvy sa objavia tu. Všetky sú dobrovoľné.
           </Empty>
         )}
+      </section>
+      <section className="panel collected-awards">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">TVOJA HISTÓRIA</p>
+            <h2>Získané drahokamy</h2>
+          </div>
+        </div>
+        <AwardHistory
+          awards={state.awards.filter((a) => a.memberId === state.me.id)}
+          activities={state.activities.filter(
+            (a) => a.memberId === state.me.id,
+          )}
+          progress={state.rules}
+        />
       </section>
     </>
   );

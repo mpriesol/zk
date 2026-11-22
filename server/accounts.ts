@@ -2,6 +2,10 @@ import { randomBytes, randomUUID, createHash } from "node:crypto";
 import type { SQLiteDatabase } from "./sqlite.ts";
 import { bootstrap } from "../lib/server.ts";
 import {
+  notifyPendingMembership,
+  resolveMembershipNotification,
+} from "./membership-notifications.ts";
+import {
   createAuth,
   type AuthSettings,
   getAuthSettings,
@@ -27,13 +31,15 @@ export interface AccountSession {
 type Row = Record<string, any>;
 class AccountError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
-const fail = (status: number, message: string): never => {
-  throw new AccountError(status, message);
+const fail = (status: number, message: string, code?: string): never => {
+  throw new AccountError(status, message, code);
 };
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -64,6 +70,7 @@ const usernameValue = (value: unknown) => {
     fail(
       400,
       "Prezývka musí mať 3 až 32 znakov: písmená, čísla, medzery, bodku, pomlčku alebo podčiarkovník.",
+      "INVALID_USERNAME",
     );
   return original;
 };
@@ -121,7 +128,7 @@ function limit(
       Number(current.window_start) > now - windowMs &&
       Number(current.count) >= max
     )
-      fail(429, "Priveľa pokusov. Skús to neskôr.");
+      fail(429, "Priveľa pokusov. Skús to neskôr.", "TOO_MANY_REQUESTS");
     db.native
       .prepare(
         "INSERT INTO auth_rate_limits(id,window_start,count) VALUES(?,?,1) ON CONFLICT(id) DO UPDATE SET window_start=excluded.window_start,count=?",
@@ -258,26 +265,63 @@ async function newPasswordUser(
   input: { username: string; password: string; name?: string; email?: string },
 ) {
   const email = input.email || `${randomUUID()}@accounts.cestou-zimy.invalid`;
-  const response = await auth.api.signUpEmail({
-    body: {
-      name: input.name || input.username,
-      email,
-      password: input.password,
-      username: input.username,
-      displayUsername: input.username,
-      rememberMe: true,
-    },
-    asResponse: true,
-  });
-  const result = await response.json();
-  if (!response.ok || !result.user?.id)
+  let response: Response;
+  try {
+    response = await auth.api.signUpEmail({
+      body: {
+        name: input.name || input.username,
+        email,
+        password: input.password,
+        username: input.username,
+        displayUsername: input.username,
+        rememberMe: true,
+      },
+      asResponse: true,
+    });
+  } catch (error) {
+    const code =
+      (error as { body?: { code?: string }; code?: string })?.body?.code ||
+      (error as { code?: string })?.code;
+    if (code === "USERNAME_IS_ALREADY_TAKEN")
+      fail(
+        409,
+        "Táto prezývka je už obsadená. Ak je to tvoj účet, prihlás sa. Inak si vyber inú prezývku.",
+        code,
+      );
     fail(
-      response.status >= 500 ? 503 : 400,
-      response.status >= 500
+      503,
+      "Účet sa momentálne nepodarilo vytvoriť. Skús to neskôr.",
+      "SIGNUP_UNAVAILABLE",
+    );
+  }
+  const result = await response!.json();
+  if (!response!.ok || !result.user?.id) {
+    const code = result?.code || result?.error?.code;
+    if (code === "USERNAME_IS_ALREADY_TAKEN")
+      fail(
+        409,
+        "Táto prezývka je už obsadená. Ak je to tvoj účet, prihlás sa. Inak si vyber inú prezývku.",
+        code,
+      );
+    fail(
+      response!.status >= 500 ? 503 : 400,
+      response!.status >= 500
         ? "Účet sa nepodarilo vytvoriť. Skús to znova."
         : "Túto prezývku nemožno použiť. Skús inú.",
+      [
+        "INVALID_USERNAME",
+        "USERNAME_TOO_SHORT",
+        "USERNAME_TOO_LONG",
+        "PASSWORD_TOO_SHORT",
+        "PASSWORD_TOO_LONG",
+      ].includes(code)
+        ? code
+        : response!.status >= 500
+          ? "SIGNUP_UNAVAILABLE"
+          : "INVALID_REGISTRATION",
     );
-  return { response, user: result.user as AccountSession["user"] };
+  }
+  return { response: response!, user: result.user as AccountSession["user"] };
 }
 async function removeNewUser(auth: Auth, userId: string) {
   const context = await auth.$context;
@@ -400,6 +444,17 @@ export async function accountEndpoint(
     }
     if (path === "/api/registration/admin" && request.method === "GET") {
       admin(db, settings, session);
+      const selectedRequestId = new URL(request.url).searchParams.get(
+        "request",
+      );
+      const focusedRequest =
+        selectedRequestId && selectedRequestId.length <= 100
+          ? db.native
+              .prepare(
+                "SELECT r.id,r.status,m.nickname,r.created_at createdAt,r.reviewed_at reviewedAt FROM membership_requests r JOIN members m ON m.user_id=r.user_id AND m.course_id=r.course_id WHERE r.id=? AND r.course_id=?",
+              )
+              .get(selectedRequestId, cid) || null
+          : null;
       const pending = db.native
         .prepare(
           "SELECT r.id,r.user_id userId,u.displayUsername username,m.nickname,r.created_at createdAt FROM membership_requests r JOIN \"user\" u ON u.id=r.user_id JOIN members m ON m.user_id=r.user_id AND m.course_id=r.course_id WHERE r.course_id=? AND r.status='pending' AND m.active=0 ORDER BY r.created_at",
@@ -419,6 +474,7 @@ export async function accountEndpoint(
         .map((r) => ({ ...r, active: !!r.active }));
       return json({
         pending,
+        ...(selectedRequestId ? { focusedRequest } : {}),
         invites,
         passwordMembers,
         passwordEnabled: passwordEnabled(settings),
@@ -449,6 +505,16 @@ export async function accountEndpoint(
         : null;
       if (inviteToken && !validInvite(db, settings, inviteToken))
         fail(400, "Pozvánka je neplatná, vypršala alebo už bola využitá.");
+      if (
+        db.native
+          .prepare('SELECT id FROM "user" WHERE username=?')
+          .get(normalizeUsername(username))
+      )
+        fail(
+          409,
+          "Táto prezývka je už obsadená. Ak je to tvoj účet, prihlás sa. Inak si vyber inú prezývku.",
+          "USERNAME_IS_ALREADY_TAKEN",
+        );
       const created = await newPasswordUser(auth, {
         username,
         password,
@@ -458,6 +524,7 @@ export async function accountEndpoint(
         transaction(db, () => {
           if (inviteToken) consumeInvite(db, settings, inviteToken);
           const memberId = randomUUID(),
+            requestId = randomUUID(),
             now = new Date().toISOString();
           db.native
             .prepare(
@@ -477,13 +544,21 @@ export async function accountEndpoint(
               "INSERT INTO membership_requests(id,course_id,user_id,status,created_at,reviewed_at,reviewed_by) VALUES(?,?,?,?,?,?,NULL)",
             )
             .run(
-              randomUUID(),
+              requestId,
               cid,
               created.user.id,
               inviteToken ? "approved" : "pending",
               now,
               inviteToken ? now : null,
             );
+          if (!inviteToken)
+            notifyPendingMembership(db, {
+              courseId: cid,
+              requestId,
+              nickname: username,
+              appUrl: settings.appUrl,
+              now,
+            });
           audit(db, cid, memberId, "account.register", {
             memberId,
             membership: inviteToken ? "active" : "pending",
@@ -520,6 +595,19 @@ export async function accountEndpoint(
             "UPDATE membership_requests SET status='approved',reviewed_at=? WHERE course_id=? AND user_id=? AND status='pending'",
           )
           .run(new Date().toISOString(), cid, session!.user.id);
+        const approvedRequest = db.native
+          .prepare(
+            "SELECT id FROM membership_requests WHERE course_id=? AND user_id=?",
+          )
+          .get(cid, session!.user.id);
+        if (approvedRequest)
+          resolveMembershipNotification(
+            db,
+            cid,
+            String(approvedRequest.id),
+            "approved",
+            new Date().toISOString(),
+          );
         const member = memberFor(db, settings, session!)!;
         audit(db, cid, member.id, "account.acceptInvite", {
           memberId: member.id,
@@ -606,6 +694,13 @@ export async function accountEndpoint(
           db.native
             .prepare("UPDATE members SET active=? WHERE id=? AND course_id=?")
             .run(data.action === "approve" ? 1 : 0, target!.member_id, cid);
+          resolveMembershipNotification(
+            db,
+            cid,
+            String(data.id),
+            data.action === "approve" ? "approved" : "rejected",
+            now,
+          );
           audit(db, cid, actor.id, "account." + data.action, {
             memberId: target!.member_id,
           });
@@ -692,7 +787,10 @@ export async function accountEndpoint(
     return json({ error: "Nepodporovaná operácia." }, 405);
   } catch (error) {
     if (error instanceof AccountError)
-      return json({ error: error.message }, error.status);
+      return json(
+        { error: error.message, ...(error.code ? { code: error.code } : {}) },
+        error.status,
+      );
     // Library errors may contain request data; return no provider internals or passwords.
     return json(
       {

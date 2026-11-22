@@ -606,6 +606,152 @@ test("duplicate case-folded usernames submitted concurrently create at most one 
       (p: any) => p.username.toLowerCase() === "duplicate_name",
     );
     assert.equal(pending.length, 1);
+    const duplicate = responses.find((response) => !response.ok)!;
+    assert.equal(duplicate.status, 409);
+    const duplicateError = await duplicate.json();
+    assert.equal(duplicateError.code, "USERNAME_IS_ALREADY_TAKEN");
+    assert.match(duplicateError.error, /obsadená/);
+    assert.equal(
+      f.db.native
+        .prepare(
+          "SELECT count(*) n FROM messages WHERE json_extract(data,'$.kind')='membership_request'",
+        )
+        .get()!.n,
+      1,
+      "duplicate registration cannot duplicate organizer notices",
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test("pending signup creates one private organizer message/outbox target, valid invites skip it and approval resolves it", async () => {
+  const f = await fixture();
+  try {
+    const response = await f.register("waiting_for_approval"),
+      pendingCookie = cookieOf(response);
+    assert.equal(response.status, 201);
+    const request = (await f.management()).pending.find(
+      (entry: any) => entry.username === "waiting_for_approval",
+    );
+    assert.ok(request);
+    const row = f.db.native
+      .prepare("SELECT * FROM messages WHERE id=?")
+      .get(`membership-${request.id}`)!;
+    const message = JSON.parse(String(row.data));
+    assert.equal(message.kind, "membership_request");
+    assert.equal(message.requestId, request.id);
+    assert.match(message.link, /^\/zk\/\?view=admin&section=members&request=/);
+    const adminMember = f.db.native
+      .prepare("SELECT id FROM members WHERE course_id=? AND role='admin'")
+      .get(f.settings.courseId)!;
+    const recipients = f.db.native
+      .prepare("SELECT member_id FROM recipients WHERE message_id=?")
+      .all(row.id);
+    assert.deepEqual(
+      recipients.map((entry) => entry.member_id),
+      [adminMember.id],
+    );
+    assert.equal(
+      f.db.native
+        .prepare(
+          "SELECT count(*) n FROM outbox WHERE kind='push' AND reference_id=? AND status='pending'",
+        )
+        .get(row.id)!.n,
+      1,
+    );
+    assert.equal(
+      (await f.call("/api/media/no-file", undefined, pendingCookie)).status,
+      403,
+      "real pending Better Auth session cannot read media",
+    );
+    const invite = await f.invite();
+    const invited = await f.register("already_invited", invite.token);
+    assert.equal(invited.status, 201);
+    assert.equal(
+      f.db.native
+        .prepare(
+          "SELECT count(*) n FROM messages WHERE json_extract(data,'$.kind')='membership_request'",
+        )
+        .get()!.n,
+      1,
+    );
+    const invitedState = await bodyOf(
+      await f.call("/api/state", undefined, cookieOf(invited)),
+    );
+    assert.equal(invitedState.pendingAccounts, undefined);
+    assert.equal(
+      invitedState.messages.some(
+        (entry: any) => entry.kind === "membership_request",
+      ),
+      false,
+    );
+    await bodyOf(await f.adminAction("approve", { id: request.id }));
+    const resolvedDetail = await bodyOf(
+      await f.call(
+        `/api/registration/admin?request=${request.id}`,
+        undefined,
+        f.adminCookie,
+      ),
+    );
+    assert.equal(resolvedDetail.focusedRequest.status, "approved");
+    assert.equal(
+      resolvedDetail.focusedRequest.nickname,
+      "waiting_for_approval",
+    );
+    assert.equal(
+      (
+        await f.call(
+          `/api/registration/admin?request=${request.id}`,
+          undefined,
+          pendingCookie,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      f.db.native
+        .prepare("SELECT status FROM outbox WHERE reference_id=?")
+        .get(row.id)!.status,
+      "cancelled",
+    );
+    assert.ok(
+      f.db.native
+        .prepare("SELECT read_at FROM recipients WHERE message_id=?")
+        .get(row.id)!.read_at,
+    );
+    const activeState = await bodyOf(
+      await f.call("/api/state", undefined, pendingCookie),
+    );
+    assert.equal(
+      activeState.messages.some(
+        (entry: any) => entry.kind === "membership_request",
+      ),
+      false,
+    );
+    f.db.native
+      .prepare("UPDATE members SET role='participant' WHERE id=?")
+      .run(adminMember.id);
+    const formerAdmin = await bodyOf(
+      await f.call("/api/state", undefined, f.adminCookie),
+    );
+    assert.equal(
+      formerAdmin.messages.some(
+        (entry: any) => entry.kind === "membership_request",
+      ),
+      false,
+      "old recipient links cannot expose admin requests after role removal",
+    );
+    assert.equal(
+      (
+        await f.call(
+          "/api/action",
+          { action: "readMessage", id: String(row.id) },
+          f.adminCookie,
+        )
+      ).status,
+      404,
+    );
   } finally {
     f.close();
   }

@@ -86,7 +86,7 @@ function VisualHarness() {
             checked={animations}
             onChange={(e) => setAnimations(e.target.checked)}
           />
-          Veverička
+          Medvedík
         </label>
       </aside>
       <div className="main-shell">

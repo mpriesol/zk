@@ -8,6 +8,12 @@ export interface Course {
   timezone: string;
   squirrelLimit: number;
   testMode: boolean;
+  year?: number;
+  eventStartDate?: string;
+  eventEndDate?: string;
+  coldUnlockDay?: number;
+  mottoStartDate?: string;
+  preparationStartedAt?: string;
 }
 export interface Member {
   id: string;
@@ -19,6 +25,7 @@ export interface Member {
   active: boolean;
   animations: boolean;
   joinedAt: string;
+  avatarUrl?: string | null;
 }
 export interface ActivityType {
   id: string;
@@ -44,6 +51,7 @@ export interface Activity {
   nickname?: string;
   reactions?: string[];
   comments?: Comment[];
+  photos?: MediaAsset[];
 }
 export interface Comment {
   id: string;
@@ -79,6 +87,9 @@ export interface Rule {
   effectiveFrom: string;
   condition: Condition;
   active: boolean;
+  visual?: RewardVisual;
+  imageMediaId?: string | null;
+  imageUrl?: string | null;
 }
 export interface Progress {
   current: number;
@@ -100,6 +111,7 @@ export interface Award {
   gem: string;
   earnedAt: string;
   snapshot: Rule;
+  visual?: RewardVisual;
 }
 export interface RuleProgress {
   rule: Rule;
@@ -125,6 +137,8 @@ export interface Challenge {
   completed?: boolean;
   manualCompleted?: boolean;
   completion?: { date: string; note: string } | null;
+  visual?: RewardVisual;
+  kind?: "cold" | "standard";
 }
 export interface Message {
   id: string;
@@ -140,6 +154,10 @@ export interface Message {
   readAt?: string | null;
   recipients?: string[];
   push?: boolean;
+  archivedAt?: string | null;
+  acknowledgedAt?: string | null;
+  kind?: "membership_request";
+  requestId?: string;
 }
 export interface WeekStat {
   week: string;
@@ -172,6 +190,81 @@ export interface AppState {
   today: string;
   pushConfigured: boolean;
   vapidPublicKey: string | null;
+  cold?: ColdState | null;
+  personalAwardDefinitions?: PersonalAwardDefinition[];
+  personalAwards?: PersonalAwardGrant[];
+  motto?: Motto | null;
+  pendingAccounts?: number;
+}
+export interface MediaAsset {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+  mimeType: string;
+  bytes: number;
+}
+export interface RewardVisual {
+  kind: "gem" | "icon" | "image";
+  value: string;
+  color?: string;
+  url?: string;
+}
+export interface PersonalAwardDefinition {
+  id: string;
+  name: string;
+  description: string;
+  visual: RewardVisual;
+  mode: "self" | "organizer";
+  status: "draft" | "published";
+  createdAt: string;
+}
+export interface PersonalAwardGrant {
+  id: string;
+  definitionId: string;
+  memberId: string;
+  date: string;
+  reason: string;
+  grantedBy: string | null;
+  source: "self" | "organizer";
+  snapshot: PersonalAwardDefinition;
+  createdAt: string;
+}
+export interface ColdEntry {
+  id: string;
+  memberId: string;
+  date: string;
+  kind: "shower" | "outdoor";
+  note: string;
+  createdAt: string;
+}
+export interface ColdState {
+  challengeId: string;
+  name: string;
+  description: string;
+  visual: RewardVisual;
+  availableFrom: string;
+  endDate: string;
+  canRecord: boolean;
+  entries: ColdEntry[];
+  calendar: Pick<ColdEntry, "memberId" | "date" | "kind">[];
+  daily: { date: string; people: number }[];
+  people: number;
+  entryDays: number;
+  activeCount: number;
+}
+export interface Motto {
+  id: string;
+  text: string;
+  author: string;
+  sourceUrl: string;
+  originalText?: string;
+  sourceWork?: string;
+  translation?: boolean;
+  active: boolean;
+  order: number;
+  dateFrom?: string;
+  dateTo?: string;
 }
 export interface Identity {
   userId: string;

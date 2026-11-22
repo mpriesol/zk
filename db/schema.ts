@@ -4,7 +4,9 @@ import {
   integer,
   real,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/sqlite-core";
+export { media } from "./media-schema.ts";
 export const courses = sqliteTable("courses", {
   id: text("id").primaryKey(),
   data: text("data").notNull(),
@@ -146,6 +148,8 @@ export const recipients = sqliteTable(
     messageId: text("message_id").notNull(),
     memberId: text("member_id").notNull(),
     readAt: text("read_at"),
+    archivedAt: text("archived_at"),
+    acknowledgedAt: text("acknowledged_at"),
   },
   (t) => [uniqueIndex("recipient_unique").on(t.messageId, t.memberId)],
 );
@@ -243,3 +247,84 @@ export const operatorPasswordAccounts = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
 );
+
+export const coldEntries = sqliteTable(
+  "cold_entries",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id").notNull(),
+    memberId: text("member_id").notNull(),
+    date: text("date").notNull(),
+    kind: text("kind").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    legacySource: text("legacy_source"),
+  },
+  (t) => [uniqueIndex("cold_member_day").on(t.courseId, t.memberId, t.date)],
+);
+export const personalAwardDefinitions = sqliteTable(
+  "personal_award_definitions",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id").notNull(),
+    data: text("data").notNull(),
+    status: text("status").notNull(),
+  },
+);
+export const personalAwardGrants = sqliteTable(
+  "personal_award_grants",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id").notNull(),
+    definitionId: text("definition_id").notNull(),
+    memberId: text("member_id").notNull(),
+    date: text("date").notNull(),
+    reason: text("reason").notNull(),
+    grantedBy: text("granted_by"),
+    source: text("source").notNull(),
+    snapshot: text("snapshot").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("personal_award_once").on(
+      t.courseId,
+      t.definitionId,
+      t.memberId,
+    ),
+  ],
+);
+export const mottos = sqliteTable("mottos", {
+  id: text("id").primaryKey(),
+  courseId: text("course_id").notNull(),
+  data: text("data").notNull(),
+  active: integer("active").notNull().default(1),
+  position: integer("position").notNull().default(0),
+});
+export const mottoDaily = sqliteTable(
+  "motto_daily",
+  {
+    courseId: text("course_id").notNull(),
+    date: text("date").notNull(),
+    mottoId: text("motto_id").notNull(),
+    snapshot: text("snapshot").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.courseId, t.date] })],
+);
+export const communitySeeds = sqliteTable(
+  "community_seed_versions",
+  { courseId: text("course_id").notNull(), version: text("version").notNull() },
+  (t) => [primaryKey({ columns: [t.courseId, t.version] })],
+);
+export const preparationPreviews = sqliteTable("preparation_previews", {
+  id: text("id").primaryKey(),
+  courseId: text("course_id").notNull(),
+  memberId: text("member_id").notNull(),
+  data: text("data").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+export const preparationGuards = sqliteTable("preparation_guards", {
+  id: text("id").primaryKey(),
+  valid: integer("valid").notNull(),
+});

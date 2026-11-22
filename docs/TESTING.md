@@ -1,5 +1,32 @@
 # Overenie aplikácie
 
+## Rozšírenie prípravy a odmien (22. 11. 2026)
+
+Táto sekcia sa vzťahuje na nové obrazovky, médiá, otužovanie, citáty, štatistiky a štart prípravy. Nižšie uvedená vizuálna kontrola z 25. 10. 2026 je historická a **nie je overením nového rozhrania**.
+
+Príkazy odovzdávacej kontroly sú `pnpm typecheck`, `pnpm test` a `APP_URL=https://hub.biketrek.sk/zk pnpm build`. Spoločný lokálny beh 22. 11. 2026 prešiel bez chýb: **185/185 testov**, 0 preskočených, úspešná kontrola typov aj produkčný build. CI rovnaké kontroly spúšťa na izolovanom GitHub runneri s Node 24; jeho výsledok je v PR.
+
+Nové cielené regresie overujú:
+
+- Skutočný kalendárny mesiac, priestupný február, pondelkové zarovnanie, zmenu roka a DST bez vynechaného/duplicitného dňa.
+- Minúty/hodiny vrátane `1,5`, round-trip jednotiek a zachovanie kanonického času.
+- Oddelené otužovanie, odomknutie od ôsmeho dňa, jednoznačné človek × dátum, viditeľnosť vlastných poznámok, legacy zachovanie a žiadny prírastok tréningových minút.
+- Výber a stabilitu denných citátov, osobné odznaky a udelenia s uloženými podmienkami/vizuálom.
+- Nezmazanie dát migráciou, presný a expirujúci náhľad štartu, chybnú zálohu, zmenu dát aj počas zálohy, transakčný rollback a čistenie súborov až po commite.
+- Zachovanie konajúceho organizátora a jeho reálnej Better Auth session, účtov iných kurzov vrátane ešte neprepojených pozvánok s overeným e-mailom a odmietnutie zastaraného náhľadu pri zmene týchto väzieb.
+- Obrázky JPEG/PNG/WebP, skutočný obsah a limity, EXIF, súkromie podľa kurzu/roly, staged upload, priradenie k aktivite a cleanup, ktorý po nejasnom úspechu nezmaže už priradený obrázok.
+- Kompletný backup/restore databázy a médií s manifestom, chýbajúce/poškodené súbory, retenciu, neduplikovanie denného jobu pri DST a zlyhanie obnovy po WAL checkpointe.
+- Konkrétnu chybu existujúcej prezývky, deduplikáciu administrátorského oznámenia, priamy vstup s pozvánkou, zrušenie neodoslaného push po vybavení žiadosti, role a deep-link ciele.
+- Reporting podľa dátumu aktivity, neúplný čas/vzdialenosť, neaktívnych členov, remízy, oprávnenosť kandidátov pri rozdeľovaní, hravé nominácie a bezpečný CSV export.
+
+### Poctivé hranice overenia tejto aktualizácie
+
+Cloudový prehliadač zablokoval lokálny náhľad na úrovni URL policy (`ERR_BLOCKED_BY_CLIENT`). Nové obrazovky preto **neboli vizuálne overené v prehliadači** a nové skutočné screenshoty nie sú súčasťou tejto verzie návodu. Nepoužili sme falošné screenshoty ani staré snímky označené ako nové. Textový a tlačiteľný návod sú pripravené v `docs/NAVOD_PRE_UCASTNIKOV.md` a `public/navod.html`.
+
+Pred pozvaním účastníkov zostáva vykonať používateľskú skúšku na mobilnom/desktopovom prehliadači: Domov (týždeň/mesiac), uloženie aktivity s fotkou a opravou, Všetci, detail s komentármi, odznaky, vločka, archív a admin náhľad spustenia bez potvrdenia. Z týchto obrazoviek treba doplniť osem krokových snímok s fiktívnymi dátami.
+
+Skutočné PWA/push doručenie na Androide/iPhone, Docker build a plánovač na produkčnom hostiteľovi nie sú nahradené automatickými testami. Produkčné dáta sa počas implementácie nemenili a spustenie prípravy sa vyvolávalo iba nad izolovanými testovacími databázami.
+
 ## Súhrn odovzdanej verzie (25. 10. 2026)
 
 - `npm run typecheck`: bez chýb.

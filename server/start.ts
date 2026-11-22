@@ -4,7 +4,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { resolve, extname, sep } from "node:path";
+import { resolve, extname, sep, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SQLiteDatabase, migrateApp } from "./sqlite.ts";
 import { databaseOperation, queuedDatabase } from "./database-queue.ts";
@@ -25,6 +25,15 @@ import {
 } from "./accounts.ts";
 import { handleRequest, type ServerConfig } from "../lib/server.ts";
 import { drainOutbox, type OutboxConfig } from "../lib/outbox.ts";
+import {
+  mediaEndpoint,
+  mediaDirectoryFromEnv,
+  cleanupUnreferencedMedia,
+  MEDIA_BODY_LIMIT,
+  type MediaConfig,
+} from "./media.ts";
+import { createSnapshot } from "../scripts/backup.mjs";
+import { schedulerMode, startBackupScheduler } from "./backup-scheduler.ts";
 import type { Identity } from "../lib/types.ts";
 import { createManifest } from "../scripts/pwa-assets.mjs";
 import {
@@ -46,7 +55,7 @@ const AUTH_ROUTES = new Map([
 export function createApiHandler(
   db: SQLiteDatabase,
   auth: ReturnType<typeof createAuth>,
-  config: ServerConfig,
+  config: ServerConfig & MediaConfig,
 ) {
   if (!config.siteUrl)
     throw new Error("API konfigurácia vyžaduje úplnú siteUrl z APP_URL.");
@@ -136,9 +145,31 @@ export function createApiHandler(
         }
       : null;
     url.pathname = path;
+    const action =
+      path === "/api/action" && request.method === "POST"
+        ? await request
+            .clone()
+            .json()
+            .then((body) => body?.action)
+            .catch(() => null)
+        : null;
     const response =
       (await accountEndpoint(request, path, session, db, auth)) ||
+      (await mediaEndpoint(request, path, identity, db, {
+        ...config,
+        trustedOrigins: settings.production ? [] : settings.trustedOrigins,
+      })) ||
       (await handleRequest(new Request(url, request), identity, db, config));
+    if (response.ok && ["saveActivity", "deleteActivity"].includes(action)) {
+      await cleanupUnreferencedMedia(
+        db,
+        config.mediaDirectory || mediaDirectoryFromEnv(),
+      ).catch(() => {
+        console.error(
+          "Media cleanup failed; unreferenced files will be retried.",
+        );
+      });
+    }
     // A new signup cookie takes precedence over cleanup of an expired cookie.
     if (!response.headers.getSetCookie().length)
       for (const cookie of sessionResponse.headers.getSetCookie())
@@ -148,15 +179,18 @@ export function createApiHandler(
   return (request: Request): Promise<Response> =>
     databaseOperation(db, () => handle(request));
 }
-async function bodyOf(request: IncomingMessage): Promise<Buffer | undefined> {
+export async function bodyOf(
+  request: IncomingMessage,
+  limit = 65536,
+): Promise<Buffer | undefined> {
   if (request.method === "GET" || request.method === "HEAD") return;
-  if (Number(request.headers["content-length"] || 0) > 65536)
+  if (Number(request.headers["content-length"] || 0) > limit)
     throw Object.assign(new Error("Príliš veľká požiadavka."), { status: 413 });
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 65536)
+    if (size > limit)
       throw Object.assign(new Error("Príliš veľká požiadavka."), {
         status: 413,
       });
@@ -236,9 +270,21 @@ export async function startServer() {
       `http://terminal.local:${port}`,
       "http://terminal.local",
     ];
-  const db = new SQLiteDatabase(
+  const databasePath = resolve(
     process.env.DATABASE_PATH || ".data/cestou-zimy.sqlite",
   );
+  const mediaDirectory = mediaDirectoryFromEnv();
+  const backupDirectory = resolve(
+    process.env.BACKUP_DIRECTORY ||
+      (development ? ".data-backups" : "/backups"),
+  );
+  if (
+    !development &&
+    (backupDirectory === dirname(databasePath) ||
+      backupDirectory.startsWith(dirname(databasePath) + sep))
+  )
+    throw new Error("BACKUP_DIRECTORY musí byť mimo živého dátového adresára.");
+  const db = new SQLiteDatabase(databasePath);
   const migrations = migrateApp(db),
     mail = createMailer(settings),
     auth = createAuth(db, settings, mail);
@@ -254,6 +300,20 @@ export async function startServer() {
       emailOtpEnabled(settings) &&
       (settings.mailMode === "file" || !!settings.smtpHost),
     emailFrom: settings.mailFrom,
+    beforePreparationStart: async ({ courseId }) => {
+      const snapshot = await createSnapshot({
+        databasePath,
+        mediaDirectory,
+        backupDirectory,
+        reason: "before-preparation-start",
+        courseId,
+        retention: Number(process.env.BACKUP_RETENTION || 30),
+      });
+      return { backupId: snapshot.backupId };
+    },
+    afterPreparationStart: async () => {
+      await cleanupUnreferencedMedia(db, mediaDirectory);
+    },
     invitationSender: async (payload) => {
       if (!emailOtpEnabled(settings) || isInternalEmail(payload.to))
         return {
@@ -288,7 +348,7 @@ export async function startServer() {
       }
     },
   };
-  const api = createApiHandler(db, auth, config);
+  const api = createApiHandler(db, auth, { ...config, mediaDirectory });
   let vite:
     | Awaited<ReturnType<(typeof import("vite"))["createServer"]>>
     | undefined;
@@ -312,7 +372,7 @@ export async function startServer() {
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader(
           "Content-Security-Policy",
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
         );
       }
       const path = new URL(req.url || "/", settings.appUrl).pathname;
@@ -347,7 +407,12 @@ export async function startServer() {
         const origin = development
           ? `http://${requestHost}`
           : new URL(settings.appUrl).origin;
-        const rawBody = await bodyOf(req);
+        const rawBody = await bodyOf(
+          req,
+          applicationPath === "/api/media" && req.method === "POST"
+            ? MEDIA_BODY_LIMIT
+            : 65536,
+        );
         const request = new Request(new URL(req.url || "/", origin), {
           method: req.method,
           headers,
@@ -521,6 +586,33 @@ export async function startServer() {
   const timer = setInterval(drain, 30000);
   timer.unref();
   drain();
+  const backupScheduler = startBackupScheduler({
+    mode: schedulerMode(process.env, backupDirectory),
+    time: process.env.BACKUP_TIME || "03:15",
+    getTimezone: () =>
+      databaseOperation(db, () => {
+        if (process.env.BACKUP_TIMEZONE) return process.env.BACKUP_TIMEZONE;
+        const course = db.native
+          .prepare("SELECT data FROM courses WHERE id=?")
+          .get(settings.courseId);
+        return course
+          ? JSON.parse(String(course.data)).timezone || "Europe/Bratislava"
+          : "Europe/Bratislava";
+      }),
+    runSnapshot: (day, timezone) =>
+      databaseOperation(db, () =>
+        createSnapshot({
+          databasePath,
+          mediaDirectory,
+          backupDirectory,
+          reason: "daily",
+          courseId: settings.courseId,
+          scheduleDate: day,
+          timezone,
+          retention: Number(process.env.BACKUP_RETENTION || 30),
+        }),
+      ),
+  });
   await new Promise<void>((resolveStart) =>
     server.listen(port, host, resolveStart),
   );
@@ -529,6 +621,7 @@ export async function startServer() {
   );
   const close = async () => {
     clearInterval(timer);
+    await backupScheduler.stop();
     await new Promise<void>((resolveClose) =>
       server.close(() => resolveClose()),
     );

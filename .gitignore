@@ -47,6 +47,7 @@ yarn-error.log*
 # Self-hosted private data
 /data/
 /.data/
+/.data-backups/
 /backups/
 /zk.env
 /deploy/Caddyfile.zk.rendered

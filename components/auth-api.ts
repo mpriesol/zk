@@ -16,7 +16,7 @@ const errorMessages: Record<string, string> = {
   INVALID_EMAIL_OR_PASSWORD: "Meno alebo heslo nesedia. Skús to znova.",
   INVALID_PASSWORD: "Súčasné heslo nesedí. Skús to znova.",
   USERNAME_IS_ALREADY_TAKEN:
-    "Toto prihlasovacie meno už niekto používa. Vyber si iné.",
+    "Táto prezývka je už obsadená. Ak je to tvoj účet, prihlás sa. Inak si vyber inú prezývku.",
   USER_ALREADY_EXISTS: "Takýto účet už existuje. Skús sa prihlásiť.",
   USERNAME_TOO_SHORT: "Prihlasovacie meno musí mať aspoň 3 znaky.",
   USERNAME_TOO_LONG: "Prihlasovacie meno môže mať najviac 32 znakov.",
@@ -36,19 +36,35 @@ const errorMessages: Record<string, string> = {
     "Pred zmenou hesla sa z bezpečnostných dôvodov odhlás a znovu prihlás.",
   SESSION_EXPIRED: "Z bezpečnostných dôvodov sa najprv znovu prihlás.",
 };
+export class AuthRequestError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "AuthRequestError";
+    this.code = code;
+  }
+}
 
 export async function authRequest<T = Record<string, unknown>>(
   path: string,
   body?: Record<string, unknown>,
 ): Promise<T> {
-  const response = await fetch(appPath(path), {
-    method: body === undefined ? "GET" : "POST",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    cache: "no-store",
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(appPath(path), {
+      method: body === undefined ? "GET" : "POST",
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new AuthRequestError(
+      "Server neodpovedal. Skontroluj pripojenie a skús to znova.",
+      "NETWORK_ERROR",
+    );
+  }
   let data: any;
   try {
     data = await response.json();
@@ -59,13 +75,19 @@ export async function authRequest<T = Record<string, unknown>>(
   }
   if (!response.ok) {
     if (response.status === 429)
-      throw new Error("Príliš veľa pokusov. Skús to neskôr.");
+      throw new AuthRequestError(
+        "Príliš veľa pokusov. Skús to neskôr.",
+        "TOO_MANY_REQUESTS",
+      );
     const code = data?.code || data?.error?.code;
     const known = typeof code === "string" ? errorMessages[code] : undefined;
-    if (known) throw new Error(known);
+    if (known) throw new AuthRequestError(known, code);
     // Application routes return curated Slovak errors; library errors use codes above.
     if (!path.startsWith("/api/auth/") && typeof data?.error === "string")
-      throw new Error(data.error);
+      throw new AuthRequestError(
+        data.error,
+        typeof code === "string" ? code : undefined,
+      );
     throw new Error(
       response.status === 503
         ? "Prihlásenie momentálne nie je dostupné. Skús to neskôr alebo sa ozvi organizátorovi."

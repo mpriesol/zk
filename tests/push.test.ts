@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
+import sharp from "sharp";
 import { createManifest } from "../scripts/pwa-assets.mjs";
 import {
   validateSubscription,
@@ -254,6 +255,8 @@ test("service worker displays generic fallback, same-origin navigation, no priva
   await pending;
   assert.equal(notices[0].title, "Cestou Zimy");
   assert.equal(notices[0].data.url, "/priprava/?view=messages");
+  assert.equal(notices[0].badge, "/priprava/brand/notification-badge.png");
+  assert.notEqual(notices[0].badge, notices[0].icon);
   handlers.notificationclick({
     notification: {
       data: { url: "/priprava/?view=messages&message=abc" },
@@ -265,6 +268,96 @@ test("service worker displays generic fallback, same-origin navigation, no priva
   });
   await pending;
   assert.deepEqual(opened, ["/priprava/?view=messages&message=abc"]);
+});
+
+test("notification click falls back after failed navigation/focus and carries the target to a live app", async () => {
+  const code = await readFile(
+    new URL("../public/sw.js", import.meta.url),
+    "utf8",
+  );
+  for (const failure of ["navigate", "focus", "null", "matchAll"]) {
+    const handlers: Record<string, (event: any) => void> = {},
+      opened: string[] = [],
+      messages: any[] = [];
+    const client = {
+      url: "https://hub.biketrek.sk/zk/?view=group",
+      navigate: async () => {
+        if (failure === "navigate") throw new Error("navigation failed");
+        return failure === "null" ? null : client;
+      },
+      focus: async () => {
+        if (failure === "focus") throw new Error("focus failed");
+        return client;
+      },
+      postMessage: (value: any) => messages.push(value),
+    };
+    vm.runInContext(
+      code,
+      vm.createContext({
+        URL,
+        self: {
+          location: { origin: "https://hub.biketrek.sk" },
+          registration: { scope: "https://hub.biketrek.sk/zk/" },
+          addEventListener: (name: string, handler: any) => {
+            handlers[name] = handler;
+          },
+          clients: {
+            matchAll: async () => {
+              if (failure === "matchAll") throw new Error("no clients");
+              return [client];
+            },
+            openWindow: async (path: string) => {
+              opened.push(path);
+            },
+          },
+        },
+      }),
+    );
+    let pending: Promise<unknown> = Promise.resolve();
+    const path = "/zk/?view=messages&message=test-message";
+    handlers.notificationclick({
+      notification: { data: { url: path }, close() {} },
+      waitUntil: (value: Promise<unknown>) => {
+        pending = value;
+      },
+    });
+    await pending;
+    assert.deepEqual(opened, [path], `${failure} must not swallow the click`);
+    if (failure === "navigate" || failure === "focus") {
+      assert.equal(messages[0].type, "notification-navigate");
+      assert.equal(messages[0].url, path);
+    }
+  }
+});
+test("notification badge is a transparent monochrome 96px asset", async () => {
+  const image = sharp(
+      await readFile(
+        new URL("../public/brand/notification-badge.png", import.meta.url),
+      ),
+    ),
+    metadata = await image.metadata();
+  assert.equal(metadata.width, 96);
+  assert.equal(metadata.height, 96);
+  assert.equal(metadata.hasAlpha, true);
+  const { data, info } = await image
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let transparent = 0,
+    visible = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i + 3] === 0) transparent++;
+    else {
+      visible++;
+      assert.equal(data[i], data[i + 1]);
+      assert.equal(data[i + 1], data[i + 2]);
+    }
+  }
+  assert.ok(
+    transparent > visible,
+    "badge silhouette has a transparent surrounding background",
+  );
+  assert.ok(visible > 0);
 });
 
 test("invitation uses server token, text body and provider idempotency key", async () => {

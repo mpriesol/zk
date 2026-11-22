@@ -1,5 +1,5 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
-import { APP_BASE_PATH } from "./paths.ts";
+import { APP_BASE_PATH, basePathFromUrl } from "./paths.ts";
 
 export interface StoredPushSubscription {
   endpoint: string;
@@ -16,6 +16,7 @@ export interface PushPayload {
   messageId: string;
   title?: string;
   body?: string;
+  url?: string;
 }
 export type SendResult =
   | { status: "accepted"; httpStatus: number }
@@ -237,7 +238,14 @@ export async function sendPush(
             message.body ||
             "Organizátor ti poslal novú správu. Otvor ju v aplikácii."
           ).slice(0, 400),
-          url: notificationPath(message.messageId, config.applicationUrl),
+          url: message.url
+            ? validNotificationPath(
+                message.url,
+                config.applicationUrl
+                  ? basePathFromUrl(config.applicationUrl)
+                  : APP_BASE_PATH,
+              )
+            : notificationPath(message.messageId, config.applicationUrl),
           tag: `cz-message-${message.messageId.slice(0, 100)}`,
         },
         options: { ttl: 86400, urgency: "normal" },

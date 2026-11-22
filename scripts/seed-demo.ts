@@ -60,6 +60,12 @@ try {
       );
   }
   let state = await api(admin);
+  // Explicitly label only this isolated development course. Normal bootstrap
+  // and production migration never switch a populated course into demo mode.
+  if (!existing) {
+    await api(admin, "saveCourse", { ...state.course, testMode: true });
+    state = await api(admin);
+  }
   const records = [
     {
       email: "anna@example.test",

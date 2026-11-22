@@ -1,15 +1,9 @@
 "use client";
 import { useState } from "react";
-import {
-  Heart,
-  MessageCircle,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Send,
-} from "lucide-react";
+import { Heart, MessageCircle, Pencil, Trash2, Send } from "lucide-react";
 import type { Activity, AppState, Comment } from "../lib/types";
-import { Avatar, SportIcon, fmt, Empty, type Action } from "./ui";
+import { Avatar, SportIcon, fmt, Empty, Modal, type Action } from "./ui";
+import "./media.css";
 function FeedCard({
   activity: a,
   state,
@@ -24,6 +18,7 @@ function FeedCard({
   allowModeration: boolean;
 }) {
   const [showComments, setShowComments] = useState(false),
+    [photoIndex, setPhotoIndex] = useState<number | null>(null),
     [text, setText] = useState(""),
     [editing, setEditing] = useState<Comment | null>(null),
     [busy, setBusy] = useState(false),
@@ -43,10 +38,17 @@ function FeedCard({
   }
   const own = a.memberId === state.me.id,
     moderator = allowModeration && state.me.role === "admin";
+  const photos = a.photos || [];
+  const latestComment = a.comments?.[a.comments.length - 1];
+  const avatarFor = (id: string) =>
+    state.members.find((member) => member.id === id)?.avatarUrl;
   return (
     <article className="feed-card">
       <div className="feed-card-head">
-        <Avatar name={a.nickname || "Účastník"} />
+        <Avatar
+          name={a.nickname || "Účastník"}
+          imageUrl={avatarFor(a.memberId)}
+        />
         <div className="feed-author">
           <strong>{a.nickname || "Účastník"}</strong>
           <span>
@@ -54,7 +56,7 @@ function FeedCard({
           </span>
         </div>
         <span className={`sport-label ${a.group}`}>
-          <SportIcon group={a.group} />
+          <SportIcon group={a.group} typeName={a.typeName} />
           <span>{a.typeName}</span>
         </span>
         {own && (
@@ -90,7 +92,7 @@ function FeedCard({
         <div className="activity-values">
           {a.minutes !== null && (
             <span>
-              <strong>{a.minutes}</strong> min
+              <strong>{a.minutes.toLocaleString("sk-SK")}</strong> min
             </span>
           )}
           {a.distance !== null && (
@@ -103,6 +105,32 @@ function FeedCard({
           )}
         </div>
         {a.note && <p className="pre-wrap">{a.note}</p>}
+        {photos.length > 0 && (
+          <div
+            className={`feed-photo-grid ${photos.length === 1 ? "single" : ""}`}
+          >
+            {photos.slice(0, 2).map((photo, index) => (
+              <button
+                key={photo.id}
+                type="button"
+                className="feed-photo-button"
+                aria-label={`Otvoriť fotografiu ${index + 1} z ${photos.length}`}
+                onClick={() => setPhotoIndex(index)}
+              >
+                <img
+                  src={photo.url}
+                  width={photo.width}
+                  height={photo.height}
+                  loading="lazy"
+                  alt={`${a.typeName} · fotografia ${index + 1}`}
+                />
+                {index === 1 && photos.length > 2 && (
+                  <span className="feed-photo-count">+{photos.length - 2}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="feed-actions">
         <button
@@ -122,17 +150,47 @@ function FeedCard({
           className="text-button"
           onClick={() => setShowComments(!showComments)}
           aria-expanded={showComments}
+          aria-label={
+            showComments
+              ? "Skryť komentáre"
+              : `Zobraziť všetky komentáre (${a.comments?.length || 0})`
+          }
         >
           <MessageCircle size={17} />
           {a.comments?.length || 0}
           <span className="comment-label">Komentáre</span>
         </button>
       </div>
+      {!showComments && latestComment && (
+        <button
+          type="button"
+          className="comment-preview"
+          onClick={() => setShowComments(true)}
+          aria-label={`Zobraziť všetky komentáre (${a.comments?.length || 0})`}
+        >
+          <Avatar
+            name={latestComment.nickname}
+            size="small"
+            imageUrl={avatarFor(latestComment.memberId)}
+          />
+          <span className="comment-preview-text">
+            <strong>{latestComment.nickname}</strong>
+            <span className="comment-preview-body">{latestComment.body}</span>
+            <span className="comment-preview-more">
+              Zobraziť všetky komentáre ({a.comments?.length || 0})
+            </span>
+          </span>
+        </button>
+      )}
       {showComments && (
         <div className="comments">
           {a.comments?.map((c) => (
             <div key={c.id} className="comment">
-              <Avatar name={c.nickname} size="small" />
+              <Avatar
+                name={c.nickname}
+                size="small"
+                imageUrl={avatarFor(c.memberId)}
+              />
               <div>
                 <strong>{c.nickname}</strong>
                 <p className="pre-wrap">{c.body}</p>
@@ -220,6 +278,51 @@ function FeedCard({
           {error}
         </p>
       )}
+      {photoIndex !== null && photos[photoIndex] && (
+        <Modal
+          title={`Fotografia ${photoIndex + 1} z ${photos.length}`}
+          onClose={() => setPhotoIndex(null)}
+          wide
+        >
+          <div
+            className="photo-lightbox"
+            onKeyDown={(event) => {
+              if (event.key === "ArrowRight")
+                setPhotoIndex(Math.min(photos.length - 1, photoIndex + 1));
+              if (event.key === "ArrowLeft")
+                setPhotoIndex(Math.max(0, photoIndex - 1));
+            }}
+          >
+            <img
+              src={photos[photoIndex].url}
+              alt={`${a.typeName} · fotografia ${photoIndex + 1}`}
+            />
+            {photos.length > 1 && (
+              <div className="photo-lightbox-controls">
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={photoIndex === 0}
+                  onClick={() => setPhotoIndex(photoIndex - 1)}
+                >
+                  Predchádzajúca
+                </button>
+                <span>
+                  {photoIndex + 1}/{photos.length}
+                </span>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={photoIndex === photos.length - 1}
+                  onClick={() => setPhotoIndex(photoIndex + 1)}
+                >
+                  Ďalšia
+                </button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </article>
   );
 }
@@ -231,6 +334,7 @@ export default function Feed({
   compact = false,
   limit,
   allowModeration = true,
+  personal = false,
 }: {
   state: AppState;
   activities: Activity[];
@@ -239,6 +343,7 @@ export default function Feed({
   compact?: boolean;
   limit?: number;
   allowModeration?: boolean;
+  personal?: boolean;
 }) {
   const [person, setPerson] = useState(""),
     [type, setType] = useState(""),
@@ -260,30 +365,42 @@ export default function Feed({
     <section className="feed-section">
       <div className="section-head">
         <div>
-          <p className="eyebrow">SPOLU NA CESTE</p>
+          <p className="eyebrow">
+            {personal ? "TVOJE ZÁPISY" : "SPOLU NA CESTE"}
+          </p>
           <h2>
-            {limit ? "Posledné zápisy" : compact ? "Zápisy" : "Denník skupiny"}
+            {personal
+              ? "Tvoje aktivity"
+              : limit
+                ? "Posledné zápisy"
+                : compact
+                  ? "Zápisy"
+                  : "Denník skupiny"}
           </h2>
         </div>
         <span className="pill neutral">{visible.length} zápisov</span>
       </div>
       {!compact && (
         <div className="filters">
-          <label className="sr-only" htmlFor="feed-person">
-            Človek
-          </label>
-          <select
-            id="feed-person"
-            value={person}
-            onChange={(e) => setPerson(e.target.value)}
-          >
-            <option value="">Všetci účastníci</option>
-            {state.members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nickname}
-              </option>
-            ))}
-          </select>
+          {!personal && (
+            <>
+              <label className="sr-only" htmlFor="feed-person">
+                Človek
+              </label>
+              <select
+                id="feed-person"
+                value={person}
+                onChange={(e) => setPerson(e.target.value)}
+              >
+                <option value="">Všetci účastníci</option>
+                {state.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nickname}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <label className="sr-only" htmlFor="feed-type">
             Typ aktivity
           </label>

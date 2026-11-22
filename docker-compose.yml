@@ -19,11 +19,23 @@ services:
       HOST: 0.0.0.0
       PORT: "3000"
       DATABASE_PATH: /data/cestou-zimy.sqlite
+      MEDIA_DIRECTORY: /data/media
+      BACKUP_DIRECTORY: /backups
+      BACKUP_SCHEDULER: ${BACKUP_SCHEDULER:-internal}
+      BACKUP_TIME: ${BACKUP_TIME:-03:15}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-30}
     expose:
       - "3000"
     # No host port: only the existing Caddy reaches the internal service.
     volumes:
       - zk_data:/data
+      # Separate host directory, outside the live SQLite/media volume.
+      # Create it for uid/gid 1000 before starting the stack.
+      - type: bind
+        source: ${BACKUP_HOST_PATH:-/srv/cestou-zimy-backups}
+        target: /backups
+        bind:
+          create_host_path: false
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
