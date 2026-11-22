@@ -26,12 +26,7 @@ export default function PersonalAwards({
   if (!definitions.length && !own.length) return null;
   return (
     <section className="personal-awards-section">
-      <div className="section-head">
-        <div>
-          <p className="eyebrow">AJ ZÁŽITKY MAJÚ SVOJE MIESTO</p>
-          <h2>Odznaky a osobné ocenenia</h2>
-        </div>
-      </div>
+      <h2 className="cz-section-title">Odznaky a osobné ocenenia</h2>
       <div className="reward-grid">
         {definitions.map((definition) => {
           const grants = own.filter((a) => a.definitionId === definition.id);
@@ -48,10 +43,10 @@ export default function PersonalAwards({
                   earned={!!grants.length}
                 />
                 <div>
-                  <span className="eyebrow">
+                  <span className="cz-kicker">
                     {definition.mode === "self"
-                      ? "PRAKTICKÁ VÝZVA"
-                      : "OD ORGANIZÁTORA"}
+                      ? "Praktická výzva"
+                      : "Udeľuje organizátor"}
                   </span>
                   <h3>{definition.name}</h3>
                 </div>

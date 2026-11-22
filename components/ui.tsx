@@ -20,11 +20,14 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  sheet = false,
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
   wide?: boolean;
+  /** On phones the dialog slides up from the bottom edge. */
+  sheet?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -40,7 +43,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal ${wide ? "wide" : ""}`}
+      className={`modal ${wide ? "wide" : ""} ${sheet ? "sheet" : ""}`}
       onCancel={(e) => {
         e.preventDefault();
         onClose();

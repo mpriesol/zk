@@ -56,7 +56,7 @@ Databázový volume, účty a heslá zostanú; používatelia sa na novej domén
 
 ## Príprava a ďalšie ročníky
 
-Hlavné obrazovky sú **Domov** (vlastný denník, kalendár, denné motto a zápis) a **Všetci** (spoločné aktivity alebo týždenný/mesačný prehľad). Výzvy, odmeny, profil a pomoc sú dostupné v ponuke. Fotografie a avatary sa bezpečne ukladajú mimo klienta. Otužovanie má samostatné vločky a nepridáva pohybové minúty.
+Mobilná navigácia má päť položiek: **Spolu** (Dnes v skupine, denné motto a spoločný feed po dňoch), **Prehľad** (týždeň/mesiac po ľuďoch, otužovanie, spoločné štatistiky), **+** (nový zápis), **Výzvy** (drahokamy, výzvy, zbierka) a **Ja** (vlastný týždeň/mesiac, zápisy, profil, upozornenia, heslo, návod, administrácia). Správy sú pod zvončekom. Fotografie a avatary sa bezpečne ukladajú mimo klienta. Otužovanie má samostatné vločky a nepridáva pohybové minúty.
 
 Organizátor môže upravovať vizuály odmien, zverejniť dobrovoľné praktické úlohy alebo udeliť vlastné ocenenie. Administrátorské štatistiky obsahujú presne definované maximá, remízy a nominácie s návrhom rozdelenia medzi viacerých ľudí. Denné citáty majú autora, zdroj, originál a označenie slovenského prekladu.
 

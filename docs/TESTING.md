@@ -23,7 +23,7 @@ Nové cielené regresie overujú:
 
 Cloudový prehliadač zablokoval lokálny náhľad na úrovni URL policy (`ERR_BLOCKED_BY_CLIENT`). Nové obrazovky preto **neboli vizuálne overené v prehliadači** a nové skutočné screenshoty nie sú súčasťou tejto verzie návodu. Nepoužili sme falošné screenshoty ani staré snímky označené ako nové. Textový a tlačiteľný návod sú pripravené v `docs/NAVOD_PRE_UCASTNIKOV.md` a `public/navod.html`.
 
-Pred pozvaním účastníkov zostáva vykonať používateľskú skúšku na mobilnom/desktopovom prehliadači: Domov (týždeň/mesiac), uloženie aktivity s fotkou a opravou, Všetci, detail s komentármi, odznaky, vločka, archív a admin náhľad spustenia bez potvrdenia. Z týchto obrazoviek treba doplniť osem krokových snímok s fiktívnymi dátami.
+Pred pozvaním účastníkov zostáva vykonať používateľskú skúšku na mobilnom/desktopovom prehliadači: Spolu, Prehľad (týždeň/mesiac), Ja, uloženie aktivity s fotkou a opravou, detail s komentármi, odznaky, vločka, archív a admin náhľad spustenia bez potvrdenia. Z týchto obrazoviek treba doplniť osem krokových snímok s fiktívnymi dátami.
 
 Skutočné PWA/push doručenie na Androide/iPhone, Docker build a plánovač na produkčnom hostiteľovi nie sú nahradené automatickými testami. Produkčné dáta sa počas implementácie nemenili a spustenie prípravy sa vyvolávalo iba nad izolovanými testovacími databázami.
 

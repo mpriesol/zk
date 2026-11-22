@@ -1,57 +1,61 @@
 # Cestou Zimy — krátky návod pre účastníkov
 
-Verzia: 22. 11. 2026
-
-> **Poznámka pre organizátora:** Toto je hotová textová verzia návodu. Skutočné screenshoty upraveného rozhrania zatiaľ nie sú priložené: otvorenie lokálneho náhľadu zablokovala politika URL prehliadača. Ilustrácia hôr v tlačiteľnej verzii je dekorácia, nie screenshot. Pred vydaním obrázkového návodu doplň skutočné zábery hotovej aplikácie s ukážkovými údajmi.
+Verzia: 22. 11. 2026 · screenshoty sú zo skutočnej aplikácie s ukážkovými údajmi (mená s označením TEST).
 
 [Otvoriť verziu na vytlačenie](../public/navod.html)
 
-Prípravu si zapisuješ svojím tempom. Na **Domove** nájdeš svoju prípravu, vo **Všetci** aktivity našej skupiny.
+Dole v appke je päť tlačidiel: **Spolu** (čo robí skupina), **Prehľad** (týždeň po ľuďoch), **+** (nový zápis), **Výzvy** a **Ja** (tvoja príprava a nastavenia).
 
-**Pri prvom príchode:** otvor odkaz od organizátora a vyber **Prihlásiť sa**, prípadne **Vytvoriť účet**, ak ešte účet nemáš. Bez platnej pozvánky nový účet čaká na schválenie; potom môžeš použiť **Skontrolovať schválenie**. Ak je tvoja prezývka už obsadená a účet patrí tebe, prihlás sa doň.
+**Pri prvom príchode:** otvor odkaz od organizátora a vyber **Prihlásiť sa**, prípadne **Vytvoriť účet**. Bez platnej pozvánky nový účet čaká na schválenie; potom použi **Skontrolovať schválenie**. Ak je tvoja prezývka už obsadená a účet patrí tebe, prihlás sa doň.
 
-## 1. Začni na Domove
+## 1. Spolu: čo robí skupina
 
-Na **Domove** máš svoj kalendár, prehľad pohybu, posledné aktivity a zbierku odmien. Nad kalendárom prepneš **Týždeň / Mesiac**; appka si túto voľbu zapamätá. Šípkami si pozrieš staršie obdobie a cez **Dnes** sa vrátiš k aktuálnemu.
+![Spolu](../public/navod/1-spolu.webp)
 
-## 2. Pridaj aktivitu
+Karta **Dnes v skupine** ukáže, koľko ľudí sa dnes hýbalo, aké aktivity pribudli a kto ich zapísal. Pod ňou sú aktivity všetkých, zoradené po dňoch. Cez **Filtrovať** vyberieš človeka, typ alebo obdobie.
 
-Na **Domove** stlač **Pridať aktivitu**, vyber druh pohybu a deň. Trvanie je voliteľné: zadaj napríklad **90 min** alebo **1,5 hod**; pripojiť môžeš aj poznámku a najviac päť fotografií. Nakoniec stlač **Uložiť aktivitu** a počkaj na dokončenie.
+## 2. Podpor a komentuj
 
-Fotografie môžu byť JPEG, PNG alebo WebP, najviac 10 MB každá. Aktivita bez trvania sa započíta ako pohybový zápis a pohybový deň; časové podmienky odmien potrebujú vyplnené trvanie.
+![Karta aktivity](../public/navod/2-karta.webp)
 
-## 3. Otvor svoj deň a oprav zápis
+Pod aktivitou stlač **Podporiť** alebo **Komentovať**. Vidíš, kto už podporil, a posledné dva komentáre; ostatné otvoríš cez počet komentárov. Klepnutím na meno otvoríš prípravu človeka.
 
-Klepnutím na deň v kalendári otvoríš jeho aktivity. Ikony ukazujú druh pohybu, bublinka komentáre a vločka otužovanie; pri viacerých aktivitách uvidíš viac ikon alebo **+N**. Svoj zápis upravíš cez ceruzku pri aktivite a zmenu potvrdíš cez **Uložiť zmeny**.
+## 3. Zapíš aktivitu tlačidlom +
 
-## 4. Pozri sa, čo zažívajú ostatní
+![Nový zápis](../public/navod/3-novy-zapis.webp)
 
-Vo **Všetci → Aktivity** nájdeš zápisy, fotografie a komentáre našej skupiny vrátane svojich. Otvor komentáre, napíš povzbudenie a odošli ho tlačidlom so šípkou; fotografiu môžeš otvoriť vo väčšom zobrazení. Vo **Všetci → Prehľad** prepneš **Týždeň / Mesiac** a otvoríš konkrétny deň alebo prípravu človeka podľa prezývky.
+Vyber typ, deň (**Dnes**, **Včera** alebo **Iný deň**) a prípadne trvanie, napríklad **90 min** alebo **1,5 hod**. Pridať môžeš vzdialenosť, poznámku a najviac päť fotografií (JPEG, PNG, WebP do 10 MB). Stlač **Uložiť**. Svoj zápis upravíš alebo zmažeš cez tri bodky na jeho karte.
 
-## 5. Pozri si výzvy a odmeny
+## 4. Prehľad skupiny
 
-**Výzvy a odmeny** otvoríš zo zbierky na Domove alebo z ponuky hore. Pri drahokame rozbaľ **Za čo sa počíta**: uvidíš podmienku, hodnotené obdobie aj započítané aktivity. Praktickú úlohu potvrď až po splnení; osobné ocenenia udeľuje organizátor a staršie drahokamy nájdeš v časti **Získané drahokamy**.
+![Prehľad](../public/navod/4-prehlad.webp)
 
-„Pohyb po vlastných“ znamená chôdzu, turistiku alebo beh; cvičenie je samostatná skupina. Presné podmienky vždy nájdeš pri konkrétnej odmene.
+Jeden riadok na človeka a 7 políčok týždňa, zoradené podľa prezývky. Hore prepneš **Týždeň / Mesiac**; appka si voľbu zapamätá. Klepnutím na políčko otvoríš deň, na meno celú prípravu človeka.
 
-## 6. Pridaj vločku za otužovanie
+## 5. Výzvy a odmeny
 
-Keď organizátor sprístupní výzvu a nastane jej začiatok, na Domove sa objaví zimná krajina **Vločka po vločke**. Stlač **Zaznamenať otužovanie**, vyber deň a **Studená sprcha / Otužovanie**, potom **Pridať vločku**. Jeden človek pridá najviac jednu vločku denne; záznam má vlastný prehľad a nepridáva tréningové minúty.
+![Výzvy](../public/navod/5-vyzvy.webp)
 
-Starší záznam nájdeš cez **Moje vločky**. Ceruzkou ho otvoríš na úpravu; poznámku k otužovaniu vidíš ty a organizátori.
+Drahokamy tohto týždňa a celej prípravy aj to, čo ešte chýba. Klepnutím na odmenu uvidíš pravidlá a započítané aktivity. Nižšie sú výzvy organizátorov a **Moja zbierka**.
 
-## 7. Prečítaj si správy a použi archív
+## 6. Pridaj vločku
 
-Zvonček hore otvorí správy organizátorov; klepnutím na názov zobrazíš celú správu. Keď ju vezmeš na vedomie, zvoľ **Beriem na vedomie · archivovať**; pripnutú správu môžeš presunúť do archívu aj priamo z Domova. Správa zostane v tvojom **Archíve** a cez **Vrátiť medzi správy** ju obnovíš; ostatným členom sa nič nemení.
+Keď organizátor sprístupní otužovanie, v okne **Nový zápis** pribudne riadok **Otužovanie** s tlačidlom **+ vločka**. Jeden človek pridá jednu vločku denne; otužovanie nepridáva tréningové minúty. Zimnú krajinu a **Moje vločky** nájdeš v Prehľade.
 
-## 8. Uprav profil a zapni upozornenia
+## 7. Ja: tvoja príprava a nastavenia
 
-Cez svoju fotografiu alebo ponuku hore otvor **Profil a nastavenia**. Môžeš zmeniť zobrazovanú prezývku, profilovú fotografiu či animácie; fotografia sa uloží až po stlačení **Uložiť fotografiu**. V časti **Upozornenia** vyber **Zapnúť upozornenia** a povoľ ich aj v otázke telefónu alebo prehliadača.
+![Ja](../public/navod/6-ja.webp)
 
-**Aplikácia na ploche:** na Androide hľadaj v ponuke prehliadača **Nainštalovať aplikáciu** alebo **Pridať na plochu**. Na iPhone otvor stránku v Safari, zvoľ **Zdieľať → Pridať na plochu** a upozornenia zapni po otvorení appky cez túto ikonu. Názvy systémových položiek sa môžu podľa zariadenia líšiť.
+Tvoj týždeň alebo mesiac, podrobné štatistiky, tvoje zápisy a nastavenia: profil a fotka, **Upozornenia na telefóne**, heslo, návod a odhlásenie.
+
+**Aplikácia na ploche:** Android — ponuka prehliadača → **Nainštalovať aplikáciu** / **Pridať na plochu**. iPhone — Safari → **Zdieľať → Pridať na plochu**; upozornenia zapni po otvorení cez novú ikonu.
+
+## 8. Správy a archív
+
+![Správy](../public/navod/7-spravy.webp)
+
+Zvonček hore otvorí správy organizátorov; dôležitá správa je aj ako pruh na začiatku Spolu. Zvoľ **Beriem na vedomie · archivovať**; správa ostane v tvojom **Archíve** a ostatným sa nič nemení.
 
 ---
 
-**Keď sa niečo nepodarí:** prečítaj hlášku pri formulári; pri neúspešnej fotografii môžeš nahratie zopakovať alebo zvoliť **Uložiť bez neúspešných fotografií**. Ak zabudneš heslo, ozvi sa organizátorovi — poskytne ti odkaz na obnovu. Svoje heslo mu neposielaj.
-
-Návod nájdeš aj v aplikácii cez **Ako na to**. Tlačiteľnú verziu otvor cez **Návod na vytlačenie** a v ponuke prehliadača vyber **Tlačiť**; môžeš ju aj uložiť ako PDF.
+**Keď sa niečo nepodarí:** prečítaj hlášku pri formulári; pri neúspešnej fotografii môžeš nahratie zopakovať alebo zvoliť **Uložiť bez neúspešných fotografií**. Ak zabudneš heslo, ozvi sa organizátorovi. Svoje heslo mu neposielaj.

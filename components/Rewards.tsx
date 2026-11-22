@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Check, ArrowRight, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type {
   AppState,
   RuleProgress,
   Challenge,
   Condition,
+  RewardVisual,
 } from "../lib/types";
 const hasManual = (c: Condition): boolean =>
   c.kind === "manual" ||
@@ -14,7 +15,6 @@ import { Gem, fmt, Modal, Empty, type Action } from "./ui";
 import AwardArt from "./AwardArt";
 import PersonalAwards from "./PersonalAwards";
 import AwardHistory from "./AwardHistory";
-import ColdPanel from "./ColdPanel";
 export function RuleCard({
   item,
   index,
@@ -54,8 +54,8 @@ export function RuleCard({
       <div className="reward-title">
         <AwardArt earned={p.complete} visual={r.visual} rewardKey={r.key} />
         <div>
-          <span className="eyebrow">
-            {r.period === "week" ? "TÝŽDENNÁ ODMENA" : "POČAS PRÍPRAVY"}
+          <span className="cz-kicker">
+            {r.period === "week" ? "Týždenná odmena" : "Raz za prípravu"}
           </span>
           <h3>{r.name}</h3>
         </div>
@@ -403,6 +403,65 @@ function ChallengeCard({
     </article>
   );
 }
+function partLabel(condition: Condition, index: number) {
+  if (condition.kind !== "combination") return "";
+  const part = condition.conditions[index];
+  if (part && part.kind !== "combination" && part.kind !== "manual") {
+    if (part.groups?.length === 1 && part.groups[0] === "foot")
+      return "Chôdza, túra, beh";
+    if (part.groups?.length === 1 && part.groups[0] === "exercise")
+      return "Cvičenie";
+  }
+  if (part?.kind === "manual") return "Praktická časť";
+  return `Časť ${index + 1}`;
+}
+function RuleRow({ item, onOpen }: { item: RuleProgress; onOpen: () => void }) {
+  const p = item.progress,
+    r = item.rule;
+  const parts = p.parts && p.parts.length > 1 ? p.parts : null;
+  return (
+    <button
+      type="button"
+      className={`cz-reward-row ${p.complete ? "done" : ""}`}
+      onClick={onOpen}
+    >
+      <span className="cz-reward-art">
+        <AwardArt earned={p.complete} visual={r.visual} rewardKey={r.key} />
+      </span>
+      <span className="cz-reward-text">
+        <strong>{r.name}</strong>
+        {parts ? (
+          parts.map((part, index) => (
+            <span className="cz-part" key={index}>
+              <small>{partLabel(r.condition, index)}</small>
+              <i aria-hidden="true">
+                <b
+                  style={{
+                    width: `${Math.min(100, (part.current / Math.max(1, part.target)) * 100)}%`,
+                  }}
+                />
+              </i>
+              <small>
+                {Math.min(part.current, part.target)}/{part.target}
+              </small>
+            </span>
+          ))
+        ) : (
+          <small className={p.complete ? "ok" : ""}>
+            {p.complete ? "Získané" : p.missing}
+          </small>
+        )}
+        {parts && p.complete && <small className="ok">Získané</small>}
+      </span>
+      {!parts && (
+        <span className="cz-reward-count">
+          {Math.min(p.current, p.target)}/{p.target}
+        </span>
+      )}
+      <ChevronRight size={18} aria-hidden="true" />
+    </button>
+  );
+}
 export default function Rewards({
   state,
   onAction,
@@ -411,11 +470,16 @@ export default function Rewards({
   onAction: Action;
 }) {
   const [filter, setFilter] = useState("current");
+  const [openRule, setOpenRule] = useState<string | null>(null);
   const active = state.rules.filter(
     (r) =>
       (r.periodStart <= state.today && r.periodEnd >= state.today) ||
       r.rule.period === "course",
   );
+  const weekly = active.filter((r) => r.rule.period === "week");
+  const course = active.filter((r) => r.rule.period !== "week");
+  const ruleKey = (r: RuleProgress) => r.rule.id + r.periodStart;
+  const opened = active.find((r) => ruleKey(r) === openRule);
   const challenges = state.challenges
     .filter((c) => c.status !== "draft" && !c.hidden && c.kind !== "cold")
     .filter((c) =>
@@ -423,85 +487,143 @@ export default function Rewards({
         ? filter === "all" || c.status === "ended" || c.endDate < state.today
         : c.status !== "ended" && c.endDate >= state.today,
     );
+  const mine = state.awards.filter((a) => a.memberId === state.me.id);
+  const collection = new Map<
+    string,
+    { name: string; visual?: RewardVisual; key: string; count: number }
+  >();
+  for (const award of mine) {
+    const item = collection.get(award.ruleKey) || {
+      name: award.name,
+      visual: award.visual || award.snapshot.visual,
+      key: award.ruleKey,
+      count: 0,
+    };
+    item.count += 1;
+    collection.set(award.ruleKey, item);
+  }
+  for (const award of (state.personalAwards || []).filter(
+    (a) => a.memberId === state.me.id,
+  )) {
+    const item = collection.get("p:" + award.definitionId) || {
+      name: award.snapshot.name,
+      visual: award.snapshot.visual,
+      key: award.definitionId,
+      count: 0,
+    };
+    item.count += 1;
+    collection.set("p:" + award.definitionId, item);
+  }
+  for (const c of state.challenges.filter(
+    (c) => c.completed && c.kind !== "cold",
+  )) {
+    collection.set("c:" + c.id, {
+      name: c.reward || c.name,
+      visual: c.visual,
+      key: c.id,
+      count: 1,
+    });
+  }
   return (
-    <>
-      <section>
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">MALÉ CIELE, SKUTOČNÉ ÚSILIE</p>
-            <h2>Tvoje drahokamy</h2>
-          </div>
-        </div>
-        <p className="section-intro">
-          Päť rôznych ciest. Pod každou odmenou uvidíš presné podmienky aj
-          aktivity, ktoré sa započítali. Pohyb po vlastných znamená chôdzu,
-          turistiku alebo beh; cvičenie tvorí samostatnú skupinu.
-        </p>
-        <div className="reward-grid">
-          {active.map((r, i) => (
-            <RuleCard
-              key={r.rule.id + r.periodStart}
-              item={r}
-              index={i}
-              state={state}
-              onAction={onAction}
-            />
-          ))}
-        </div>
-      </section>
-      <PersonalAwards state={state} onAction={onAction} />
-      {state.cold && <ColdPanel state={state} onAction={onAction} compact />}
-      <section>
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">NIEČO NAVYŠE</p>
-            <h2>Výzvy od organizátorov</h2>
-          </div>
-          <label className="sr-only" htmlFor="challenge-filter">
-            Stav výziev
-          </label>
-          <select
-            id="challenge-filter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="current">Aktuálne a budúce</option>
-            <option value="ended">Ukončené</option>
-            <option value="all">Všetky zverejnené</option>
-          </select>
-        </div>
-        {challenges.length ? (
-          <div className="challenge-grid">
-            {challenges.map((c) => (
-              <ChallengeCard
-                key={c.id}
-                c={c}
-                state={state}
-                onAction={onAction}
+    <div className="cz-rewards">
+      {weekly.length > 0 && (
+        <>
+          <h2 className="cz-section-title">
+            Tento týždeň{" "}
+            <small>
+              {fmt(weekly[0].periodStart)} – {fmt(weekly[0].periodEnd)}
+            </small>
+          </h2>
+          <div className="cz-block cz-list">
+            {weekly.map((r) => (
+              <RuleRow
+                key={ruleKey(r)}
+                item={r}
+                onOpen={() => setOpenRule(ruleKey(r))}
               />
             ))}
           </div>
-        ) : (
-          <Empty title="V tejto časti zatiaľ nie je výzva">
-            Nové zverejnené výzvy sa objavia tu. Všetky sú dobrovoľné.
-          </Empty>
-        )}
-      </section>
-      <section className="panel collected-awards">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">TVOJA HISTÓRIA</p>
-            <h2>Získané drahokamy</h2>
+        </>
+      )}
+      {course.length > 0 && (
+        <>
+          <h2 className="cz-section-title">Za celú prípravu</h2>
+          <div className="cz-block cz-list">
+            {course.map((r) => (
+              <RuleRow
+                key={ruleKey(r)}
+                item={r}
+                onOpen={() => setOpenRule(ruleKey(r))}
+              />
+            ))}
           </div>
+        </>
+      )}
+      <p className="cz-muted cz-pad">
+        Pohyb po vlastných je chôdza, turistika alebo beh; cvičenie je
+        samostatná skupina. Klepnutím na odmenu uvidíš presné podmienky a
+        započítané aktivity.
+      </p>
+      <PersonalAwards state={state} onAction={onAction} />
+      <div className="cz-section-title with-tool">
+        <h2>Výzvy od organizátorov</h2>
+        <label className="sr-only" htmlFor="challenge-filter">
+          Stav výziev
+        </label>
+        <select
+          id="challenge-filter"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="current">Aktuálne a budúce</option>
+          <option value="ended">Ukončené</option>
+          <option value="all">Všetky zverejnené</option>
+        </select>
+      </div>
+      {challenges.length ? (
+        <div className="challenge-grid cz-challenges">
+          {challenges.map((c) => (
+            <ChallengeCard key={c.id} c={c} state={state} onAction={onAction} />
+          ))}
         </div>
-        <AwardHistory
-          awards={state.awards.filter((a) => a.memberId === state.me.id)}
-          activities={state.activities.filter(
-            (a) => a.memberId === state.me.id,
-          )}
-          progress={state.rules}
-        />
+      ) : (
+        <Empty title="V tejto časti zatiaľ nie je výzva">
+          Nové zverejnené výzvy sa objavia tu. Všetky sú dobrovoľné.
+        </Empty>
+      )}
+      <h2 className="cz-section-title">Moja zbierka</h2>
+      <section className="cz-block cz-collection">
+        {collection.size === 0 ? (
+          <p className="cz-muted">
+            Zatiaľ prázdna. Prvý drahokam pribudne po splnení podmienky.
+          </p>
+        ) : (
+          <div className="cz-collection-grid">
+            {[...collection.values()].map((item) => (
+              <span key={item.key + item.name} className="cz-collected">
+                <AwardArt earned visual={item.visual} rewardKey={item.key} />
+                <small>{item.name}</small>
+                <b>×{item.count}</b>
+              </span>
+            ))}
+          </div>
+        )}
+        <details className="cz-details inner">
+          <summary>História získaných drahokamov</summary>
+          <AwardHistory
+            awards={mine}
+            activities={state.activities.filter(
+              (a) => a.memberId === state.me.id,
+            )}
+            progress={state.rules}
+          />
+        </details>
       </section>
-    </>
+      {opened && (
+        <Modal title="Detail odmeny" onClose={() => setOpenRule(null)}>
+          <RuleCard item={opened} index={0} state={state} onAction={onAction} />
+        </Modal>
+      )}
+    </div>
   );
 }

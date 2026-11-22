@@ -8,10 +8,13 @@ export default function ColdPanel({
   state,
   onAction,
   compact = false,
+  variant = "full",
 }: {
   state: AppState;
   onAction: Action;
   compact?: boolean;
+  /** "row": one line with a button, used in the new-entry sheet. */
+  variant?: "full" | "row";
 }) {
   const cold = state.cold;
   const id = useId().replaceAll(":", "");
@@ -39,16 +42,168 @@ export default function ColdPanel({
     setError("");
     setOpen(true);
   }
+  const dialog = open ? (
+    <>
+      {open && (
+        <Modal
+          title="Tvoja vločka do zimnej krajiny"
+          onClose={() => !busy && setOpen(false)}
+        >
+          <form
+            className="stack"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              setError("");
+              try {
+                await onAction("saveColdEntry", { date, kind, note });
+                setOpen(false);
+              } catch (e) {
+                setError(
+                  e instanceof Error
+                    ? e.message
+                    : "Záznam sa nepodarilo uložiť.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p>
+              Stačí zaznamenať deň. Otužovanie má vlastný prehľad a nepridáva
+              tréningové minúty.
+            </p>
+            <label className="field">
+              Dátum
+              <input
+                type="date"
+                required
+                value={date}
+                min={cold.availableFrom}
+                max={state.today < cold.endDate ? state.today : cold.endDate}
+                onChange={(e) => {
+                  const found = cold.entries.find(
+                    (entry) => entry.date === e.target.value,
+                  );
+                  setDate(e.target.value);
+                  setKind(found?.kind || "shower");
+                  setNote(found?.note || "");
+                }}
+              />
+            </label>
+            <label className="field">
+              Ako to bolo?
+              <select
+                value={kind}
+                onChange={(e) =>
+                  setKind(e.target.value as "shower" | "outdoor")
+                }
+              >
+                <option value="shower">Studená sprcha</option>
+                <option value="outdoor">Otužovanie</option>
+              </select>
+            </label>
+            <label className="field">
+              Poznámka pre seba a organizátorov · nepovinná
+              <textarea
+                value={note}
+                maxLength={2000}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </label>
+            {existing && (
+              <p className="info-note">
+                Tento deň už má vločku. Uložením upravíš pôvodný záznam.
+              </p>
+            )}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="form-actions">
+              {existing && (
+                <button
+                  type="button"
+                  className="button danger"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (
+                      !window.confirm(`Odstrániť tvoju vločku z ${fmt(date)}?`)
+                    )
+                      return;
+                    setBusy(true);
+                    setError("");
+                    try {
+                      await onAction("deleteColdEntry", { id: existing.id });
+                      setOpen(false);
+                    } catch (e) {
+                      setError(
+                        e instanceof Error
+                          ? e.message
+                          : "Zmenu sa nepodarilo uložiť.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Odstrániť
+                </button>
+              )}
+              <button className="button cold-button" disabled={busy}>
+                <Snowflake size={17} />
+                {busy
+                  ? "Ukladám…"
+                  : existing
+                    ? "Uložiť zmenu"
+                    : "Pridať vločku"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  ) : null;
+  if (variant === "row")
+    return (
+      <div className="cz-cold-row">
+        <span className="cz-cold-icon" aria-hidden="true">
+          <Snowflake size={20} />
+        </span>
+        <span>
+          <strong>Otužovanie</strong>
+          <small>
+            {todayEntry
+              ? "Dnešná vločka je pridaná"
+              : "samostatne, nepridáva minúty"}
+          </small>
+        </span>
+        {cold.canRecord ? (
+          <button
+            type="button"
+            className="cz-cold-button"
+            onClick={() => edit(todayEntry)}
+          >
+            {todayEntry
+              ? "Upraviť"
+              : state.today > cold.endDate
+                ? "Doplniť deň"
+                : "+ vločka"}
+          </button>
+        ) : (
+          <small>od {fmt(cold.availableFrom)}</small>
+        )}
+        {dialog}
+      </div>
+    );
   return (
     <section className={`cold-panel ${compact ? "compact" : ""}`}>
       <div className="section-head">
-        <div>
-          <p className="eyebrow">NAŠA ZIMNÁ KRAJINA</p>
-          <h2>Vločka po vločke</h2>
-        </div>
-        <Snowflake size={24} />
+        <h2>Studená sprcha alebo otužovanie</h2>
+        <Snowflake size={22} aria-hidden="true" />
       </div>
-      <p className="cold-subtitle">Studená sprcha alebo otužovanie</p>
       <div
         className="winter-landscape"
         role="img"
@@ -176,126 +331,7 @@ export default function ColdPanel({
             ))}
         </details>
       )}
-      {open && (
-        <Modal
-          title="Tvoja vločka do zimnej krajiny"
-          onClose={() => !busy && setOpen(false)}
-        >
-          <form
-            className="stack"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setBusy(true);
-              setError("");
-              try {
-                await onAction("saveColdEntry", { date, kind, note });
-                setOpen(false);
-              } catch (e) {
-                setError(
-                  e instanceof Error
-                    ? e.message
-                    : "Záznam sa nepodarilo uložiť.",
-                );
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <p>
-              Stačí zaznamenať deň. Otužovanie má vlastný prehľad a nepridáva
-              tréningové minúty.
-            </p>
-            <label className="field">
-              Dátum
-              <input
-                type="date"
-                required
-                value={date}
-                min={cold.availableFrom}
-                max={state.today < cold.endDate ? state.today : cold.endDate}
-                onChange={(e) => {
-                  const found = cold.entries.find(
-                    (entry) => entry.date === e.target.value,
-                  );
-                  setDate(e.target.value);
-                  setKind(found?.kind || "shower");
-                  setNote(found?.note || "");
-                }}
-              />
-            </label>
-            <label className="field">
-              Ako to bolo?
-              <select
-                value={kind}
-                onChange={(e) =>
-                  setKind(e.target.value as "shower" | "outdoor")
-                }
-              >
-                <option value="shower">Studená sprcha</option>
-                <option value="outdoor">Otužovanie</option>
-              </select>
-            </label>
-            <label className="field">
-              Poznámka pre seba a organizátorov · nepovinná
-              <textarea
-                value={note}
-                maxLength={2000}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </label>
-            {existing && (
-              <p className="info-note">
-                Tento deň už má vločku. Uložením upravíš pôvodný záznam.
-              </p>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="form-actions">
-              {existing && (
-                <button
-                  type="button"
-                  className="button danger"
-                  disabled={busy}
-                  onClick={async () => {
-                    if (
-                      !window.confirm(`Odstrániť tvoju vločku z ${fmt(date)}?`)
-                    )
-                      return;
-                    setBusy(true);
-                    setError("");
-                    try {
-                      await onAction("deleteColdEntry", { id: existing.id });
-                      setOpen(false);
-                    } catch (e) {
-                      setError(
-                        e instanceof Error
-                          ? e.message
-                          : "Zmenu sa nepodarilo uložiť.",
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  <Trash2 size={16} />
-                  Odstrániť
-                </button>
-              )}
-              <button className="button cold-button" disabled={busy}>
-                <Snowflake size={17} />
-                {busy
-                  ? "Ukladám…"
-                  : existing
-                    ? "Uložiť zmenu"
-                    : "Pridať vločku"}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {dialog}
     </section>
   );
 }

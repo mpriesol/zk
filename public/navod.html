@@ -164,6 +164,17 @@
       .step p {
         font-size: 13px;
       }
+      .shot {
+        margin: 12px 0 0;
+      }
+      .shot img {
+        display: block;
+        width: 195px;
+        max-width: 100%;
+        height: auto;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
       .step .tip {
         font-size: 12px;
         color: var(--muted);
@@ -356,8 +367,10 @@
       </header>
       <section class="start" aria-label="Ako začať">
         <p>
-          Prípravu si zapisuješ svojím tempom. Na <strong>Domove</strong> nájdeš
-          svoju prípravu, vo <strong>Všetci</strong> aktivity našej skupiny.
+          Dole v appke je päť tlačidiel: <strong>Spolu</strong> (čo robí
+          skupina), <strong>Prehľad</strong> (týždeň po ľuďoch),
+          <strong>+</strong> (nový zápis), <strong>Výzvy</strong> a
+          <strong>Ja</strong> (tvoja príprava a nastavenia).
         </p>
         <p>
           <strong>Prvý príchod:</strong> otvor odkaz od organizátora a vyber
@@ -371,59 +384,98 @@
         <li class="step">
           <div class="step-heading">
             <span class="step-number" aria-hidden="true">1</span>
-            <h2>Začni na Domove</h2>
+            <h2>Spolu: čo robí skupina</h2>
           </div>
           <p>
-            Na <strong>Domove</strong> máš svoj kalendár, prehľad pohybu,
-            posledné aktivity a zbierku odmien. Nad kalendárom prepneš
-            <strong>Týždeň / Mesiac</strong>; appka si túto voľbu zapamätá.
-            Šípkami si pozrieš staršie obdobie a cez <strong>Dnes</strong> sa
-            vrátiš k aktuálnemu.
+            Po otvorení appky vidíš <strong>Spolu</strong>. Karta
+            <strong>Dnes v skupine</strong> ukáže, koľko ľudí sa dnes hýbalo,
+            aké aktivity pribudli a kto ich zapísal. Pod ňou sú aktivity
+            všetkých, zoradené po dňoch. Cez <strong>Filtrovať</strong> vyberieš
+            človeka, typ alebo obdobie.
           </p>
+          <figure class="shot">
+            <img
+              src="navod/1-spolu.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Obrazovka Spolu s kartou Dnes v skupine"
+            />
+          </figure>
         </li>
         <li class="step">
           <div class="step-heading">
             <span class="step-number" aria-hidden="true">2</span>
-            <h2>Pridaj aktivitu</h2>
+            <h2>Podpor a komentuj</h2>
           </div>
           <p>
-            Na Domove stlač <strong>Pridať aktivitu</strong>, vyber druh pohybu
-            a deň. Trvanie je voliteľné: zadaj napríklad
-            <strong>90 min</strong> alebo <strong>1,5 hod</strong>; pripojiť
-            môžeš poznámku a najviac päť fotografií. Stlač
-            <strong>Uložiť aktivitu</strong> a počkaj na dokončenie.
+            Pod aktivitou stlač <strong>Podporiť</strong> alebo
+            <strong>Komentovať</strong>. Vidíš, kto už podporil, a posledné dva
+            komentáre; ostatné otvoríš cez počet komentárov. Fotografiu zväčšíš
+            klepnutím, prípravu človeka otvoríš klepnutím na jeho meno.
           </p>
-          <p class="tip">
-            Fotky: JPEG, PNG alebo WebP, do 10 MB každá. Bez trvania sa započíta
-            pohybový deň; časové podmienky odmien potrebujú vyplnené trvanie.
-          </p>
+          <figure class="shot">
+            <img
+              src="navod/2-karta.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Karta aktivity s fotografiou, podporou a komentármi"
+            />
+          </figure>
         </li>
         <li class="step">
           <div class="step-heading">
             <span class="step-number" aria-hidden="true">3</span>
-            <h2>Otvor svoj deň</h2>
+            <h2>Zapíš aktivitu tlačidlom +</h2>
           </div>
           <p>
-            Klepnutím na deň v kalendári otvoríš jeho aktivity. Ikony ukazujú
-            druh pohybu, bublinka komentáre a vločka otužovanie; pri viacerých
-            aktivitách uvidíš viac ikon alebo <strong>+N</strong>. Svoj zápis
-            upravíš cez ceruzku pri aktivite a potvrdíš cez
-            <strong>Uložiť zmeny</strong>.
+            Stredné tlačidlo <strong>+</strong> otvorí
+            <strong>Nový zápis</strong>. Vyber typ, deň (<strong>Dnes</strong>,
+            <strong>Včera</strong> alebo <strong>Iný deň</strong>) a prípadne
+            trvanie: napríklad <strong>90 min</strong> alebo
+            <strong>1,5 hod</strong>. Pridať môžeš vzdialenosť, poznámku a
+            najviac päť fotografií. Stlač <strong>Uložiť</strong>.
           </p>
+          <p class="tip">
+            Svoj zápis upravíš alebo zmažeš cez tri bodky na jeho karte. Fotky:
+            JPEG, PNG alebo WebP, do 10 MB. Bez trvania sa započíta pohybový
+            deň, časové podmienky odmien potrebujú trvanie.
+          </p>
+          <figure class="shot">
+            <img
+              src="navod/3-novy-zapis.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Okno Nový zápis s výberom typu a dňa"
+            />
+          </figure>
         </li>
         <li class="step">
           <div class="step-heading">
             <span class="step-number" aria-hidden="true">4</span>
-            <h2>Pozri sa na skupinu</h2>
+            <h2>Prehľad skupiny</h2>
           </div>
           <p>
-            Vo <strong>Všetci → Aktivity</strong> nájdeš zápisy, fotografie a
-            komentáre vrátane svojich. Otvor komentáre, napíš povzbudenie a
-            odošli ho tlačidlom so šípkou; fotografiu môžeš zväčšiť. Vo
-            <strong>Všetci → Prehľad</strong> prepneš
-            <strong>Týždeň / Mesiac</strong> a otvoríš konkrétny deň alebo
-            prípravu človeka podľa prezývky.
+            V <strong>Prehľade</strong> je jeden riadok na človeka a 7 políčok
+            týždňa, zoradené podľa prezývky. Hore prepneš
+            <strong>Týždeň / Mesiac</strong>, appka si voľbu zapamätá. Klepnutím
+            na políčko otvoríš daný deň, na meno celú prípravu človeka.
           </p>
+          <p class="tip">
+            Malá vločka v políčku znamená otužovanie. Zimná krajina so zapojením
+            skupiny je nižšie v Prehľade.
+          </p>
+          <figure class="shot">
+            <img
+              src="navod/4-prehlad.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Prehľad týždňa po ľuďoch"
+            />
+          </figure>
         </li>
         <li class="step">
           <div class="step-heading">
@@ -431,16 +483,24 @@
             <h2>Výzvy a odmeny</h2>
           </div>
           <p>
-            <strong>Výzvy a odmeny</strong> otvoríš zo zbierky na Domove alebo z
-            ponuky hore. Pri drahokame rozbaľ <strong>Za čo sa počíta</strong>:
-            uvidíš podmienku, obdobie aj započítané aktivity. Praktickú úlohu
-            potvrď po splnení; osobné ocenenia udeľuje organizátor a históriu
-            nájdeš v časti <strong>Získané drahokamy</strong>.
+            Vo <strong>Výzvach</strong> vidíš drahokamy tohto týždňa a celej
+            prípravy aj to, čo ešte chýba. Klepnutím na odmenu uvidíš presné
+            pravidlá a započítané aktivity. Nižšie sú výzvy organizátorov a
+            <strong>Moja zbierka</strong>.
           </p>
           <p class="tip">
             „Pohyb po vlastných“ je chôdza, turistika alebo beh; cvičenie je
-            samostatná skupina. Presné pravidlá sú pri konkrétnej odmene.
+            samostatná skupina.
           </p>
+          <figure class="shot">
+            <img
+              src="navod/5-vyzvy.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Obrazovka Výzvy a odmeny"
+            />
+          </figure>
         </li>
         <li class="step">
           <div class="step-heading">
@@ -448,44 +508,28 @@
             <h2>Pridaj vločku</h2>
           </div>
           <p>
-            Keď organizátor sprístupní výzvu a nastane jej začiatok, na Domove
-            sa objaví <strong>Vločka po vločke</strong>. Stlač
-            <strong>Zaznamenať otužovanie</strong>, vyber deň a
-            <strong>Studená sprcha / Otužovanie</strong>, potom
+            Keď organizátor sprístupní otužovanie, v okne
+            <strong>Nový zápis</strong> pribudne riadok
+            <strong>Otužovanie</strong> s tlačidlom <strong>+ vločka</strong>.
+            Vyber deň a <strong>Studená sprcha / Otužovanie</strong>, potom
             <strong>Pridať vločku</strong>. Jeden človek pridá jednu vločku
             denne; otužovanie nepridáva tréningové minúty.
           </p>
           <p class="tip">
-            Starší záznam upravíš cez <strong>Moje vločky</strong> a ceruzku.
-            Poznámku vidíš ty a organizátori.
+            Staršie vločky upravíš v Prehľade cez <strong>Moje vločky</strong>.
           </p>
         </li>
         <li class="step">
           <div class="step-heading">
             <span class="step-number" aria-hidden="true">7</span>
-            <h2>Správy a archív</h2>
+            <h2>Ja: tvoja príprava a nastavenia</h2>
           </div>
           <p>
-            Zvonček hore otvorí správy; klepnutím na názov zobrazíš celý text.
-            Zvoľ <strong>Beriem na vedomie · archivovať</strong>; pripnutú
-            správu môžeš presunúť aj priamo z Domova. Nájdeš ju v
-            <strong>Archíve</strong> a cez
-            <strong>Vrátiť medzi správy</strong> ju obnovíš; ostatným sa nič
-            nemení.
-          </p>
-        </li>
-        <li class="step">
-          <div class="step-heading">
-            <span class="step-number" aria-hidden="true">8</span>
-            <h2>Profil a upozornenia</h2>
-          </div>
-          <p>
-            Cez svoju fotografiu alebo ponuku hore otvor
-            <strong>Profil a nastavenia</strong>. Zmeníš zobrazovanú prezývku,
-            fotografiu či animácie; novú fotku potvrď cez
-            <strong>Uložiť fotografiu</strong>. V časti Upozornenia vyber
-            <strong>Zapnúť upozornenia</strong> a povoľ ich aj v systémovej
-            otázke.
+            V <strong>Ja</strong> je tvoj týždeň alebo mesiac, podrobné
+            štatistiky, tvoje zápisy a nastavenia: profil a fotka,
+            <strong>Upozornenia na telefóne</strong>, heslo, návod a odhlásenie.
+            Upozornenia zapneš tlačidlom <strong>Zapnúť upozornenia</strong> a
+            potvrdíš aj v otázke telefónu.
           </p>
           <p class="tip">
             <strong>Android:</strong> ponuka prehliadača → Nainštalovať
@@ -493,6 +537,36 @@
             Zdieľať → Pridať na plochu; upozornenia zapni po otvorení cez novú
             ikonu. Názvy položiek sa môžu líšiť.
           </p>
+          <figure class="shot">
+            <img
+              src="navod/6-ja.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Obrazovka Ja s týždňom a nastaveniami"
+            />
+          </figure>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">8</span>
+            <h2>Správy a archív</h2>
+          </div>
+          <p>
+            Zvonček hore otvorí správy organizátorov; dôležitá správa sa ukáže
+            aj ako pruh na začiatku Spolu. Klepnutím na názov zobrazíš celý
+            text. Zvoľ <strong>Beriem na vedomie · archivovať</strong>; správu
+            nájdeš v <strong>Archíve</strong> a ostatným sa nič nemení.
+          </p>
+          <figure class="shot">
+            <img
+              src="navod/7-spravy.webp"
+              width="195"
+              height="380"
+              loading="lazy"
+              alt="Zoznam správ organizátorov"
+            />
+          </figure>
         </li>
       </ol>
       <aside class="help" aria-labelledby="help-title">
@@ -508,8 +582,8 @@
       <footer class="footer">
         <span>Cestou Zimy · každý svojím tempom</span>
         <span
-          >Návod nájdeš aj cez <strong>Ako na to</strong> · verzia 22. 11.
-          2026</span
+          >Návod nájdeš aj cez <strong>Ako na to</strong> · verzia 22. 11. 2026
+          · screenshoty s ukážkovými údajmi</span
         >
       </footer>
     </main>

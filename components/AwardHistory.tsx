@@ -114,7 +114,7 @@ export default function AwardHistory({
                 rewardKey={award.ruleKey}
               />
               <div>
-                <span className="eyebrow">ZÍSKANÁ ODMENA</span>
+                <span className="cz-kicker">Získaná odmena</span>
                 <h3>{snapshot.name}</h3>
               </div>
               <span className="pill success">

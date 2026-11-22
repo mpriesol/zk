@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { newRequestId } from "./request-id";
 import type { Activity, AppState } from "../lib/types";
-import { Modal, type Action } from "./ui";
+import { Modal, SportIcon, add, type Action } from "./ui";
+import ColdPanel from "./ColdPanel";
 import MediaPicker, {
   existingMediaSelection,
   type MediaSelection,
@@ -133,67 +134,109 @@ export default function ActivityForm({
       setBusy(false);
     }
   }
+  const types = state.types.filter(
+    (t) =>
+      !t.hidden &&
+      (t.active || t.id === activity?.typeId) &&
+      t.group !== "task",
+  );
+  const selectedType = types.find((t) => t.id === typeId);
+  const maxDate =
+    state.today < state.course.endDate ? state.today : state.course.endDate;
+  const yesterday = add(state.today, -1);
+  const chips = [
+    { date: state.today, label: "Dnes" },
+    { date: yesterday, label: "Včera" },
+  ].filter((c) => c.date >= state.course.startDate && c.date <= maxDate);
+  const [otherDay, setOtherDay] = useState(
+    () => !chips.some((c) => c.date === date),
+  );
+  const showDistance = selectedType?.group !== "exercise" || distance !== "";
+  function changeUnit(next: DurationUnit) {
+    if (next === unit) return;
+    if (durationError) {
+      setError(durationError);
+      return;
+    }
+    setUnit(next);
+    setDuration(displayDuration(canonicalMinutes, next));
+  }
   return (
     <Modal
-      title={activity ? "Upraviť aktivitu" : "Nová aktivita"}
+      title={activity ? "Upraviť zápis" : "Nový zápis"}
       onClose={close}
+      sheet
     >
-      <p className="muted form-intro">
-        Aj obyčajná prechádzka má svoje miesto. Zapíš si pohyb tak, ako bol.
-      </p>
-      <form onSubmit={save} className="stack">
-        <label className="field">
-          Aktivita
-          <select
-            value={typeId}
-            disabled={busy}
-            onChange={(e) => setTypeId(e.target.value)}
-            required
-          >
-            {state.types
-              .filter(
-                (t) =>
-                  !t.hidden &&
-                  (t.active || t.id === activity?.typeId) &&
-                  t.group !== "task",
-              )
-              .map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label className="field">
-          Deň aktivity
-          <input
-            type="date"
-            disabled={busy}
-            value={date}
-            min={state.course.startDate}
-            max={
-              state.today < state.course.endDate
-                ? state.today
-                : state.course.endDate
-            }
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-        </label>
-        <div className="grid-two">
-          <div className="field">
-            <label htmlFor="activity-duration">
-              Trvanie <span className="field-hint">nepovinné</span>
+      <form onSubmit={save} className="cz-entry">
+        <fieldset className="cz-entry-block" disabled={busy}>
+          <legend>Čo</legend>
+          <div className="cz-type-grid">
+            {types.map((t) => (
+              <button
+                type="button"
+                key={t.id}
+                aria-pressed={t.id === typeId}
+                onClick={() => setTypeId(t.id)}
+              >
+                <span className={`cz-type g-${t.group}`} aria-hidden="true">
+                  <SportIcon group={t.group} typeName={t.name} size={22} />
+                </span>
+                <span>{t.name}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="cz-entry-block" disabled={busy}>
+          <legend>Kedy</legend>
+          <div className="cz-chip-row">
+            {chips.map((c) => (
+              <button
+                type="button"
+                key={c.date}
+                aria-pressed={!otherDay && date === c.date}
+                onClick={() => {
+                  setOtherDay(false);
+                  setDate(c.date);
+                }}
+              >
+                {c.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={otherDay}
+              onClick={() => setOtherDay(true)}
+            >
+              Iný deň…
+            </button>
+          </div>
+          {otherDay && (
+            <label className="field cz-date">
+              <span className="sr-only">Deň aktivity</span>
+              <input
+                type="date"
+                value={date}
+                min={state.course.startDate}
+                max={maxDate}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
             </label>
-            <div className="duration-input">
+          )}
+        </fieldset>
+        <div className={`cz-entry-numbers ${showDistance ? "" : "single"}`}>
+          <div className="field">
+            <label htmlFor="activity-duration">Trvanie</label>
+            <div className="cz-duration">
               <input
                 id="activity-duration"
                 type="text"
                 inputMode="decimal"
-                placeholder={unit === "min" ? "napr. 45" : "napr. 1,5"}
+                placeholder={unit === "min" ? "45" : "1,5"}
                 value={duration}
                 disabled={busy}
                 aria-invalid={!!durationError}
+                aria-describedby="duration-hint"
                 onChange={(e) => {
                   setDuration(e.target.value);
                   try {
@@ -208,87 +251,99 @@ export default function ActivityForm({
                   }
                 }}
               />
-              <select
+              <div
+                className="cz-segmented"
+                role="group"
                 aria-label="Jednotka trvania"
-                value={unit}
-                disabled={busy}
-                onChange={(event) => {
-                  if (durationError) {
-                    setError(durationError);
-                    return;
-                  }
-                  const next = event.target.value as DurationUnit;
-                  setUnit(next);
-                  setDuration(displayDuration(canonicalMinutes, next));
-                }}
               >
-                <option value="min">min</option>
-                <option value="hour">hod</option>
-              </select>
+                <button
+                  type="button"
+                  aria-pressed={unit === "min"}
+                  disabled={busy}
+                  onClick={() => changeUnit("min")}
+                >
+                  min
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={unit === "hour"}
+                  disabled={busy}
+                  onClick={() => changeUnit("hour")}
+                >
+                  hod
+                </button>
+              </div>
             </div>
+            <small id="duration-hint" className="cz-hint">
+              {durationError
+                ? durationError
+                : canonicalMinutes !== null && unit === "hour"
+                  ? `= ${canonicalMinutes} minút`
+                  : "nepovinné, v minútach alebo hodinách"}
+            </small>
           </div>
-          <label className="field">
-            Vzdialenosť <span className="field-hint">km · nepovinné</span>
-            <input
-              type="number"
-              disabled={busy}
-              min="0"
-              max="1000"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="napr. 3,5"
-              value={distance}
-              onChange={(e) => setDistance(e.target.value)}
-            />
-          </label>
+          {showDistance && (
+            <label className="field">
+              Vzdialenosť
+              <span className="cz-unit-input">
+                <input
+                  type="number"
+                  disabled={busy}
+                  min="0"
+                  max="1000"
+                  step="0.1"
+                  inputMode="decimal"
+                  placeholder="nepovinné"
+                  value={distance}
+                  onChange={(e) => setDistance(e.target.value)}
+                />
+                <span aria-hidden="true">km</span>
+              </span>
+            </label>
+          )}
         </div>
-        <p className="info-note">
-          Bez trvania sa zápis počíta ako aktivita a pohybový deň. Časovú
-          podmienku odmeny splní až s vyplnenými minútami.
-        </p>
+        {canonicalMinutes === null && !durationError && duration === "" && (
+          <p className="cz-hint">
+            Bez trvania sa zápis počíta ako pohybový deň, ale nesplní časové
+            podmienky odmien.
+          </p>
+        )}
         <label className="field">
           Poznámka{" "}
-          <span className="field-hint">
-            nepovinné · uvidia ju členovia kurzu
-          </span>
+          <span className="field-hint">nepovinné · uvidí ju skupina</span>
           <textarea
             disabled={busy}
             value={note}
             maxLength={2000}
             rows={3}
-            placeholder="Kam ťa to dnes zavialo?"
+            placeholder="Kam viedla cesta, ako to išlo…"
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
         <MediaPicker items={photos} onChange={setPhotos} disabled={busy} />
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
+        {!activity && state.cold && (
+          <ColdPanel state={state} onAction={onAction} variant="row" />
         )}
-        <div className="form-actions">
-          <button
-            type="button"
-            className="button secondary"
-            disabled={busy}
-            onClick={close}
-          >
-            Zrušiť
-          </button>
-          <button className="button primary" disabled={busy}>
-            {busy ? "Ukladám…" : activity ? "Uložiť zmeny" : "Uložiť aktivitu"}
+        <div className="cz-entry-footer">
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
+          )}
+          {photos.some((photo) => photo.status === "error") && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => void save(undefined, true)}
+            >
+              Uložiť bez neúspešných fotografií
+            </button>
+          )}
+          <button className="button primary cz-save" disabled={busy}>
+            {busy ? "Ukladám…" : activity ? "Uložiť zmeny" : "Uložiť"}
           </button>
         </div>
-        {photos.some((photo) => photo.status === "error") && (
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            onClick={() => void save(undefined, true)}
-          >
-            Uložiť bez neúspešných fotografií
-          </button>
-        )}
       </form>
     </Modal>
   );
