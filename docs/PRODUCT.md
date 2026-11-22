@@ -4,10 +4,13 @@ Jeden aktuálny kurz s identifikátorom `COURSE_ID`, dospelí pozvaní účastn�
 
 ## Obrazovky
 
-Hlavná navigácia má **Domov** a **Všetci**. Výzvy, profil, správy a administrácia sú samostatne dostupné cez ponuku, avatar alebo zvonček.
+Hlavná navigácia (od 22. 11. 2026) má päť stále viditeľných položiek: **Spolu · Prehľad · + · Výzvy · Ja**. Správy sú pod zvončekom, administrácia v Ja a v bočnom paneli na desktope. Staré odkazy `?view=home|group|challenges|me` sa presmerujú na nové obrazovky.
 
-- **Domov:** vlastný denník, jediný vstup Pridať aktivitu, denné motto, vlastný týždenný/mesačný kalendár, štatistiky, zbierka, osobná pripnutá správa a samostatná zimná krajina otužovania.
-- **Všetci:** prepínač Aktivity/Prehľad. Spoločné zápisy, fotografie a komentáre, abecedná skupina s týždenným alebo skutočným mesačným kalendárom, detail dňa/človeka. Voľby zobrazenia sa pamätajú pre aktuálneho člena.
+- **Spolu:** pruh dôležitej správy, karta Dnes v skupine (ľudia, aktivity podľa typu, kto zapísal, otužovanie zvlášť, zapojenie v týždni), denné motto a chronologický feed po dňoch s podporou, komentármi a filtrom.
+- **Prehľad:** týždeň alebo mesiac po ľuďoch, abecedne; detail dňa/človeka, zimná krajina otužovania a spoločné štatistiky. Voľby sa pamätajú pre aktuálneho člena.
+- **+ / Nový zápis:** spodný panel s mriežkou typov, Dnes/Včera/Iný deň, trvanie min/hod, fotografie a samostatný riadok pre vločku.
+- **Výzvy:** drahokamy týždňa a prípravy s detailom pravidiel, osobné ocenenia, výzvy organizátorov a zbierka.
+- **Ja:** vlastný týždeň/mesiac, kalendár, štatistiky, vlastné zápisy, profil, upozornenia, heslo, návod, administrácia a odhlásenie.
 - **Výzvy a odmeny:** päť pôvodných drahokamov, presné podmienky a započítané záznamy, publikované výzvy, praktické odznaky, osobné ocenenia a história odmien.
 - **Profil a nastavenia:** prezývka, fotografia s výrezom, heslo, animácie medvedíka/osláv, dobrovoľný push a odhlásenie. Pôvodný tab Ja sa nepoužíva.
 - **Správy:** vlastné doručené správy a osobný archív. Potvrdenie pripnutej správy ju skryje len aktuálnemu človeku.

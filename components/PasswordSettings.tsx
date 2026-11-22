@@ -43,7 +43,6 @@ export default function PasswordSettings({
   }
   return (
     <section className="panel password-settings">
-      <p className="eyebrow">TVOJ ÚČET</p>
       <h2>
         <KeyRound size={22} aria-hidden="true" /> Prihlásenie a heslo
       </h2>

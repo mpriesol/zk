@@ -28,7 +28,7 @@ Zostáva konfigurácia: typy pohybu, pravidlá, šablóny a obrázky ocenení, k
 
 Výzva má samostatné záznamy, neovplyvňuje pohybové dni ani minúty. V administrácii ju zverejni, keď je pripravená. Účastníkom sa sprístupní najskôr v ôsmy deň prípravy, prípadne neskôr podľa nastaveného dňa a začiatku výzvy. Do tej doby sa jej skrytý obsah neposiela účastníckemu API.
 
-Na Domove je zimná krajinka. Jedna dnešná vločka znamená jedného človeka s dnešným záznamom; súčasne vidno počet ľudí a súčet jedinečných dní človek × dátum za prípravu. V kalendári je malá vločka vedľa ikon bežných aktivít. Dve sprchy v jeden deň nevytvoria dve vločky. Druh je sprcha alebo otužovanie, bez merania výdrže či intenzity.
+V Prehľade je zimná krajinka; vločka sa zapisuje aj v okne Nový zápis. Jedna dnešná vločka znamená jedného človeka s dnešným záznamom; súčasne vidno počet ľudí a súčet jedinečných dní človek × dátum za prípravu. V kalendári je malá vločka vedľa ikon bežných aktivít. Dve sprchy v jeden deň nevytvoria dve vločky. Druh je sprcha alebo otužovanie, bez merania výdrže či intenzity.
 
 Skupina vidí dátumy a druh záznamu. Poznámku vidí iba jej autor a organizátor. Spätné doplnenie a oprava sú možné v platnom období aj po ukončení výzvy.
 
@@ -63,12 +63,12 @@ Zapni **Rozdeľ ocenenia medzi čo najviac ľudí**, označ vhodné kategórie a
 
 V **Rozšírených nastaveniach** vyber začiatok zobrazovania a spravuj knižnicu citátov: text, autor, HTTPS zdroj, pôvodné znenie, dielo, poradie, aktívny stav a voliteľný interval. Katalóg začína ôsmimi krátkymi autentickými citátmi nájdenými cez [LibQuotes](https://libquotes.com/) a overenými podľa pomenovaných diel. Slovenské znenia sú označené ako vlastné preklady.
 
-Citát je nad tlačidlom na Domove. Pre všetkých sa vyberie podľa miestneho dňa kurzu a uloží sa denná verzia. Obnovenie stránky citát nezmení; úpravy knižnice sa prejavia pri ďalšom výbere. Po poslednom vhodnom citáte sa poradie opakuje. Ďalšie citáty môžeš priebežne pridávať bez nového nasadenia.
+Citát je na obrazovke Spolu pod kartou Dnes v skupine. Pre všetkých sa vyberie podľa miestneho dňa kurzu a uloží sa denná verzia. Obnovenie stránky citát nezmení; úpravy knižnice sa prejavia pri ďalšom výbere. Po poslednom vhodnom citáte sa poradie opakuje. Ďalšie citáty môžeš priebežne pridávať bez nového nasadenia.
 
 ## Správy, registrácie a používateľský návod
 
 Nová registrácia bez platnej pozvánky vytvorí trvalé upozornenie pre aktuálnych administrátorov a pokus o push, ak ho majú zapnutý. Platná pozvánka nevytvára falošné čakanie. Klik vedie na príslušnú časť členov; už vybavená žiadosť ukáže svoj stav.
 
-Archivovanie pripnutej správy je osobné. Keď účastník stlačí **Beriem na vedomie**, správa zmizne iba z jeho Domova a zostane v jeho archíve. Neprestane byť pripnutá ostatným.
+Archivovanie pripnutej správy je osobné. Keď účastník stlačí **Beriem na vedomie**, správa zmizne iba z jeho obrazovky Spolu a zostane v jeho archíve. Neprestane byť pripnutá ostatným.
 
 Používateľ má **Ako na to** priamo v ponuke a tlačiteľný návod na `/navod.html` pod aktuálnym prefixom aplikácie. [Textová verzia](NAVOD_PRE_UCASTNIKOV.md) je pripravená na distribúciu. Aktuálna implementácia neobsahuje falošné screenshoty: nové prehliadačové snímky sú otvoreným overovacím bodom uvedeným v TESTING.md.

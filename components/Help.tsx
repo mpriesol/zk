@@ -2,45 +2,41 @@ import { appPath } from "../lib/paths";
 import { ArrowUpRight } from "lucide-react";
 const steps = [
   [
-    "Začni na Domove",
-    "Tu máš svoj kalendár, prehľad pohybu a vlastné aktivity. Medzi týždňom a kalendárnym mesiacom prepneš nad kalendárom. Appka si tvoju voľbu zapamätá.",
+    "Spolu: čo robí skupina",
+    "Po otvorení appky vidíš Spolu. Hore je Dnes v skupine: koľko ľudí sa dnes hýbalo, aké aktivity pribudli a kto ich zapísal. Pod tým sú aktivity všetkých, zoradené po dňoch. Tlačidlom Filtrovať vyberieš človeka, typ alebo obdobie.",
   ],
   [
-    "Pridaj aktivitu",
-    "Na Domove stlač Pridať aktivitu. Vyber typ, deň a prípadne trvanie v minútach alebo hodinách. Môžeš pridať poznámku a najviac päť fotografií. Nakoniec zvoľ Uložiť aktivitu.",
+    "Podpor a komentuj",
+    "Pod každou aktivitou je Podporiť a Komentovať. Pri karte vidíš, kto už podporil, a posledné dva komentáre. Klepnutím na meno otvoríš prípravu daného človeka.",
   ],
   [
-    "Otvor svoj deň",
-    "V kalendári sú ikony aktivít. Bublinka znamená komentár, vločka otužovanie. Klepni na deň a otvoríš jeho zápisy. Svoju aktivitu upravíš cez ceruzku v jej detaile.",
+    "Zapíš aktivitu tlačidlom +",
+    "Stredné tlačidlo + v spodnej lište otvorí Nový zápis. Vyber typ, deň (Dnes, Včera alebo Iný deň), prípadne trvanie v minútach alebo hodinách a vzdialenosť. Môžeš pridať poznámku a najviac päť fotografií. Svoju aktivitu upravíš alebo zmažeš cez tri bodky na jej karte.",
   ],
   [
-    "Pozri sa, čo zažívajú ostatní",
-    "Vo Všetci nájdeš Aktivity s fotografiami a komentármi. V Prehľade prepneš týždeň alebo mesiac a otvoríš konkrétny deň človeka. Ľudia sú zoradení podľa prezývky.",
+    "Prehľad skupiny",
+    "V Prehľade je jeden riadok na človeka a 7 políčok týždňa, ľudia sú zoradení podľa prezývky. Medzi týždňom a mesiacom prepneš hore, appka si voľbu zapamätá. Klepnutím na políčko otvoríš daný deň.",
   ],
   [
-    "Zbieraj odmeny",
-    "Výzvy a odmeny otvoríš zo svojej zbierky na Domove alebo z ponuky hore. Pri drahokame vidíš presné pravidlá aj započítané aktivity. Praktickú výzvu potvrdíš až po splnení; osobné ocenenie môže udeliť organizátor.",
+    "Výzvy a odmeny",
+    "Vo Výzvach vidíš drahokamy tohto týždňa a celej prípravy s tým, čo ešte chýba. Klepnutím na odmenu uvidíš presné pravidlá aj započítané aktivity. Nižšie sú výzvy organizátorov a tvoja zbierka.",
   ],
   [
-    "Pridaj vločku",
-    "Keď organizátor sprístupní otužovanie, na Domove sa objaví zimná krajina. Tlačidlom Zaznamenať otužovanie pridáš sprchu alebo otužovanie k vybranému dňu. Každý človek pridá jednu vločku denne; záznam sa nemieša s tréningovými minútami.",
+    "Otužovanie a vločky",
+    "Keď organizátor sprístupní otužovanie, v okne Nový zápis pribudne riadok Otužovanie s tlačidlom + vločka. Zimná krajina so zapojením skupiny je v Prehľade. Vločka sa nemieša s tréningovými minútami; v kalendári ju spoznáš podľa malej vločky.",
   ],
   [
-    "Prečítaj si správy",
-    "Zvonček hore otvorí správy organizátorov. Dôležitú správu môžeš vziať na vedomie a presunúť do vlastného archívu. Všetci ostatní ju naďalej uvidia vo svojom účte.",
+    "Ja: tvoja príprava",
+    "V Ja je tvoj týždeň alebo mesiac, podrobné štatistiky, tvoje zápisy a nastavenia: profil a fotka, upozornenia na telefóne, heslo, návod a odhlásenie. Organizátor tu nájde aj Administráciu.",
   ],
   [
-    "Uprav profil a upozornenia",
-    "Cez svoj avatar alebo ponuku otvor Profil a nastavenia. Zmeníš prezývku, fotografiu, heslo či animácie a zapneš upozornenia. Android: v ponuke prehliadača Nainštalovať aplikáciu. iPhone: Safari → Zdieľať → Pridať na plochu; upozornenia povoľ v takto otvorenej appke.",
+    "Správy a appka na ploche",
+    "Zvonček hore otvorí správy organizátorov. Dôležitú správu môžeš vziať na vedomie a presunúť do vlastného archívu. Android: v ponuke prehliadača Nainštalovať aplikáciu. iPhone: Safari → Zdieľať → Pridať na plochu; upozornenia povoľ v takto otvorenej appke.",
   ],
 ];
 export default function Help() {
   return (
     <section className="panel help-panel">
-      <p className="section-intro">
-        Krátky sprievodca aplikáciou Cestou Zimy. Každý svojím tempom, spoločne
-        na jednej ceste.
-      </p>
       <ol className="help-steps">
         {steps.map(([title, text], i) => (
           <li key={title}>

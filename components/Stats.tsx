@@ -68,7 +68,6 @@ export default function Stats({
     <section className="panel stats-panel">
       <div className="section-head">
         <div>
-          <p className="eyebrow">{group ? "NAŠE ZÁPISY" : "TVOJE ZÁPISY"}</p>
           <h2>{group ? "Spoločný prehľad" : "Prehľad prípravy"}</h2>
         </div>
         <label>

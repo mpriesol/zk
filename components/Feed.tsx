@@ -1,28 +1,84 @@
 "use client";
-import { useState } from "react";
-import { Heart, MessageCircle, Pencil, Trash2, Send } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import {
+  Heart,
+  MessageCircle,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Send,
+  SlidersHorizontal,
+} from "lucide-react";
 import type { Activity, AppState, Comment } from "../lib/types";
-import { Avatar, SportIcon, fmt, Empty, Modal, type Action } from "./ui";
+import { Avatar, SportIcon, fmt, add, Empty, Modal, type Action } from "./ui";
 import "./media.css";
-function FeedCard({
+
+/** Slovak plural: 1 komentár, 2–4 komentáre, 0 a 5+ komentárov. */
+export function plural(n: number, one: string, few: string, many: string) {
+  return n === 1 ? one : n >= 2 && n <= 4 ? few : many;
+}
+export function formatMinutes(minutes: number) {
+  if (minutes < 60) return `${minutes.toLocaleString("sk-SK")} min`;
+  const h = Math.floor(minutes / 60),
+    m = Math.round(minutes - h * 60);
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+/** "Dnes", "Včera" or "piatok 20. 11." for day dividers. */
+export function dayLabel(date: string, today: string) {
+  if (date === today) return "Dnes";
+  if (date === add(today, -1)) return "Včera";
+  const weekday = fmt(date, { weekday: "long" });
+  return `${weekday.charAt(0).toLocaleUpperCase("sk")}${weekday.slice(1)} ${fmt(date)}`;
+}
+function shortDay(date: string, today: string) {
+  if (date === today) return "dnes";
+  if (date === add(today, -1)) return "včera";
+  return `${fmt(date, { weekday: "short" })} ${fmt(date)}`;
+}
+function supportText(ids: string[], state: AppState) {
+  const names = ids.map((id) =>
+    id === state.me.id
+      ? "ty"
+      : state.members.find((m) => m.id === id)?.nickname || "účastník",
+  );
+  const mineFirst = [...names].sort((a, b) =>
+    a === "ty" ? -1 : b === "ty" ? 1 : 0,
+  );
+  const text =
+    mineFirst.length === 1
+      ? mineFirst[0]
+      : mineFirst.length === 2
+        ? `${mineFirst[0]} a ${mineFirst[1]}`
+        : `${mineFirst[0]}, ${mineFirst[1]} a ${plural(mineFirst.length - 2, "ďalší", "ďalší", "ďalších")} ${mineFirst.length - 2}`;
+  return text.charAt(0).toLocaleUpperCase("sk") + text.slice(1);
+}
+
+export function FeedCard({
   activity: a,
   state,
   onEdit,
   onAction,
   allowModeration,
+  onPerson,
+  expanded = false,
 }: {
   activity: Activity;
   state: AppState;
   onEdit: (a: Activity) => void;
   onAction: Action;
   allowModeration: boolean;
+  onPerson?: (memberId: string) => void;
+  expanded?: boolean;
 }) {
-  const [showComments, setShowComments] = useState(false),
+  const [showAll, setShowAll] = useState(expanded),
+    [composing, setComposing] = useState(expanded),
+    [longNote, setLongNote] = useState(false),
     [photoIndex, setPhotoIndex] = useState<number | null>(null),
     [text, setText] = useState(""),
     [editing, setEditing] = useState<Comment | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
   async function run(action: string, data: Record<string, unknown>) {
     setBusy(true);
     setError("");
@@ -39,176 +95,218 @@ function FeedCard({
   const own = a.memberId === state.me.id,
     moderator = allowModeration && state.me.role === "admin";
   const photos = a.photos || [];
-  const latestComment = a.comments?.[a.comments.length - 1];
+  const comments = a.comments || [];
+  const reactions = a.reactions || [];
+  const reacted = reactions.includes(state.me.id);
+  const visibleComments = showAll ? comments : comments.slice(-2);
   const avatarFor = (id: string) =>
     state.members.find((member) => member.id === id)?.avatarUrl;
+  const name = a.nickname || "Účastník";
+  const noteIsLong = a.note.length > 240 || a.note.split("\n").length > 4;
+  function startComment() {
+    setComposing(true);
+    setTimeout(() => input.current?.focus(), 30);
+  }
+  function remove() {
+    if (
+      confirm(
+        own
+          ? "Odstrániť tento zápis? Odmeny a súhrny sa prepočítajú."
+          : "Moderátorsky odstrániť tento zápis? Zásah sa zaznamená.",
+      )
+    )
+      void run("deleteActivity", { id: a.id });
+  }
   return (
-    <article className="feed-card">
-      <div className="feed-card-head">
-        <Avatar
-          name={a.nickname || "Účastník"}
-          imageUrl={avatarFor(a.memberId)}
-        />
-        <div className="feed-author">
-          <strong>{a.nickname || "Účastník"}</strong>
+    <article className="cz-card">
+      <header className="cz-card-head">
+        <button
+          type="button"
+          className="cz-person"
+          onClick={() => onPerson?.(a.memberId)}
+          disabled={!onPerson}
+          aria-label={onPerson ? `Príprava: ${name}` : undefined}
+        >
+          <Avatar name={name} imageUrl={avatarFor(a.memberId)} />
           <span>
-            {fmt(a.date, { weekday: "short", day: "numeric", month: "long" })}
+            <strong>
+              {name}
+              {own && <small> · ty</small>}
+            </strong>
+            <small>
+              {a.typeName} · {shortDay(a.date, state.today)}
+            </small>
           </span>
-        </div>
-        <span className={`sport-label ${a.group}`}>
-          <SportIcon group={a.group} typeName={a.typeName} />
-          <span>{a.typeName}</span>
+        </button>
+        <span className={`cz-type g-${a.group}`} aria-hidden="true">
+          <SportIcon group={a.group} typeName={a.typeName} size={21} />
         </span>
-        {own && (
-          <button
-            className="icon-button"
-            onClick={() => onEdit(a)}
-            aria-label={`Upraviť aktivitu ${a.typeName}`}
-          >
-            <Pencil size={16} />
-          </button>
-        )}
         {(own || moderator) && (
-          <button
-            className="icon-button quiet-danger"
-            aria-label="Odstrániť aktivitu"
-            disabled={busy}
-            onClick={() => {
-              if (
-                confirm(
-                  own
-                    ? "Odstrániť tento zápis? Odmeny a súhrny sa prepočítajú."
-                    : "Moderátorsky odstrániť tento zápis? Zásah sa zaznamená.",
-                )
-              )
-                void run("deleteActivity", { id: a.id });
-            }}
-          >
-            <Trash2 size={16} />
-          </button>
+          <details className="cz-more">
+            <summary aria-label="Možnosti zápisu">
+              <MoreHorizontal size={20} />
+            </summary>
+            <div>
+              {own && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.currentTarget.closest("details")?.removeAttribute("open");
+                    onEdit(a);
+                  }}
+                >
+                  <Pencil size={16} /> Upraviť
+                </button>
+              )}
+              <button
+                type="button"
+                className="danger"
+                disabled={busy}
+                onClick={(e) => {
+                  e.currentTarget.closest("details")?.removeAttribute("open");
+                  remove();
+                }}
+              >
+                <Trash2 size={16} />
+                {own ? "Zmazať" : "Odstrániť (moderácia)"}
+              </button>
+            </div>
+          </details>
         )}
-      </div>
-      <div className="feed-body">
-        <div className="activity-values">
-          {a.minutes !== null && (
-            <span>
-              <strong>{a.minutes.toLocaleString("sk-SK")}</strong> min
-            </span>
+      </header>
+      {(a.minutes !== null || a.distance !== null || a.group !== "task") && (
+        <div className="cz-stats">
+          {a.group !== "task" && (
+            <div>
+              <small>Čas</small>
+              <strong className={a.minutes === null ? "unknown" : ""}>
+                {a.minutes === null ? "neuvedený" : formatMinutes(a.minutes)}
+              </strong>
+            </div>
           )}
           {a.distance !== null && (
-            <span>
-              <strong>{a.distance.toLocaleString("sk-SK")}</strong> km
-            </span>
-          )}
-          {a.minutes === null && a.group !== "task" && (
-            <span className="muted">trvanie neuvedené</span>
+            <div>
+              <small>Vzdialenosť</small>
+              <strong>{a.distance.toLocaleString("sk-SK")} km</strong>
+            </div>
           )}
         </div>
-        {a.note && <p className="pre-wrap">{a.note}</p>}
-        {photos.length > 0 && (
-          <div
-            className={`feed-photo-grid ${photos.length === 1 ? "single" : ""}`}
-          >
-            {photos.slice(0, 2).map((photo, index) => (
-              <button
-                key={photo.id}
-                type="button"
-                className="feed-photo-button"
-                aria-label={`Otvoriť fotografiu ${index + 1} z ${photos.length}`}
-                onClick={() => setPhotoIndex(index)}
-              >
-                <img
-                  src={photo.url}
-                  width={photo.width}
-                  height={photo.height}
-                  loading="lazy"
-                  alt={`${a.typeName} · fotografia ${index + 1}`}
-                />
-                {index === 1 && photos.length > 2 && (
-                  <span className="feed-photo-count">+{photos.length - 2}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="feed-actions">
+      )}
+      {a.note && (
+        <div className="cz-note">
+          <p className={`pre-wrap ${noteIsLong && !longNote ? "clamped" : ""}`}>
+            {a.note}
+          </p>
+          {noteIsLong && (
+            <button
+              type="button"
+              className="cz-link"
+              onClick={() => setLongNote(!longNote)}
+            >
+              {longNote ? "menej" : "viac"}
+            </button>
+          )}
+        </div>
+      )}
+      {photos.length > 0 && (
         <button
-          className={`text-button reaction ${a.reactions?.includes(state.me.id) ? "reacted" : ""}`}
-          aria-pressed={a.reactions?.includes(state.me.id) || false}
+          type="button"
+          className="cz-photo"
+          aria-label={`Otvoriť fotografie (${photos.length})`}
+          onClick={() => setPhotoIndex(0)}
+        >
+          <img
+            src={photos[0].url}
+            width={photos[0].width}
+            height={photos[0].height}
+            loading="lazy"
+            alt={`${a.typeName} · fotografia 1`}
+          />
+          {photos.length > 1 && <span>1 / {photos.length}</span>}
+        </button>
+      )}
+      {(reactions.length > 0 || comments.length > 0) && (
+        <div className="cz-social">
+          {reactions.length > 0 ? (
+            <span className="cz-supporters">
+              <span className="cz-stack" aria-hidden="true">
+                {reactions.slice(0, 3).map((id) => {
+                  const m = state.members.find((member) => member.id === id);
+                  return (
+                    <Avatar
+                      key={id}
+                      name={m?.nickname || "?"}
+                      imageUrl={m?.avatarUrl}
+                      size="tiny"
+                    />
+                  );
+                })}
+              </span>
+              <span>{supportText(reactions, state)}</span>
+            </span>
+          ) : (
+            <span />
+          )}
+          {comments.length > 0 && (
+            <button
+              type="button"
+              className="cz-link quiet"
+              onClick={() => {
+                setShowAll(true);
+                setComposing(true);
+              }}
+            >
+              {comments.length}{" "}
+              {plural(comments.length, "komentár", "komentáre", "komentárov")}
+            </button>
+          )}
+        </div>
+      )}
+      <div className="cz-actions">
+        <button
+          type="button"
+          className={reacted ? "reacted" : ""}
+          aria-pressed={reacted}
           disabled={busy}
           onClick={() => void run("reaction", { activityId: a.id })}
         >
-          <Heart
-            size={17}
-            fill={a.reactions?.includes(state.me.id) ? "currentColor" : "none"}
-          />
-          <span>{a.reactions?.length || 0}</span>
-          <span className="sr-only">Podporiť</span>
+          <Heart size={18} fill={reacted ? "currentColor" : "none"} />
+          {reacted ? "Podporené" : "Podporiť"}
         </button>
-        <button
-          className="text-button"
-          onClick={() => setShowComments(!showComments)}
-          aria-expanded={showComments}
-          aria-label={
-            showComments
-              ? "Skryť komentáre"
-              : `Zobraziť všetky komentáre (${a.comments?.length || 0})`
-          }
-        >
-          <MessageCircle size={17} />
-          {a.comments?.length || 0}
-          <span className="comment-label">Komentáre</span>
+        <button type="button" onClick={startComment}>
+          <MessageCircle size={18} />
+          Komentovať
         </button>
       </div>
-      {!showComments && latestComment && (
-        <button
-          type="button"
-          className="comment-preview"
-          onClick={() => setShowComments(true)}
-          aria-label={`Zobraziť všetky komentáre (${a.comments?.length || 0})`}
-        >
-          <Avatar
-            name={latestComment.nickname}
-            size="small"
-            imageUrl={avatarFor(latestComment.memberId)}
-          />
-          <span className="comment-preview-text">
-            <strong>{latestComment.nickname}</strong>
-            <span className="comment-preview-body">{latestComment.body}</span>
-            <span className="comment-preview-more">
-              Zobraziť všetky komentáre ({a.comments?.length || 0})
-            </span>
-          </span>
-        </button>
-      )}
-      {showComments && (
-        <div className="comments">
-          {a.comments?.map((c) => (
-            <div key={c.id} className="comment">
+      {(visibleComments.length > 0 || composing) && (
+        <div className="cz-comments">
+          {visibleComments.map((c) => (
+            <div key={c.id} className="cz-comment">
               <Avatar
                 name={c.nickname}
-                size="small"
+                size="tiny"
                 imageUrl={avatarFor(c.memberId)}
               />
               <div>
-                <strong>{c.nickname}</strong>
-                <p className="pre-wrap">{c.body}</p>
+                <p className="pre-wrap">
+                  <strong>{c.nickname}</strong> {c.body}
+                </p>
                 {(c.memberId === state.me.id || moderator) && (
-                  <div className="comment-tools">
+                  <span className="cz-comment-tools">
                     {c.memberId === state.me.id && (
                       <button
-                        className="text-button"
+                        type="button"
                         onClick={() => {
                           setEditing(c);
                           setText(c.body);
+                          startComment();
                         }}
                       >
                         Upraviť
                       </button>
                     )}
                     <button
-                      className="text-button"
+                      type="button"
                       onClick={() => {
                         if (confirm("Odstrániť komentár?"))
                           void run("deleteComment", { id: c.id });
@@ -216,65 +314,76 @@ function FeedCard({
                     >
                       Odstrániť
                     </button>
-                  </div>
+                  </span>
                 )}
               </div>
             </div>
           ))}
-          <form
-            className="comment-form"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!text.trim()) return;
-              if (
-                await run("saveComment", {
-                  id: editing?.id,
-                  activityId: a.id,
-                  body: text,
-                })
-              ) {
-                setText("");
-                setEditing(null);
-              }
-            }}
-          >
-            <label className="sr-only" htmlFor={`comment-${a.id}`}>
-              Komentár
-            </label>
-            <input
-              id={`comment-${a.id}`}
-              maxLength={1000}
-              placeholder={
-                editing ? "Upraviť komentár…" : "Napíš niečo povzbudivé…"
-              }
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              required
-            />
+          {!showAll && comments.length > 2 && (
             <button
-              className="icon-button"
-              disabled={busy || !text.trim()}
-              aria-label="Uložiť komentár"
+              type="button"
+              className="cz-link"
+              onClick={() => setShowAll(true)}
             >
-              <Send size={18} />
+              Zobraziť všetky {comments.length}{" "}
+              {plural(comments.length, "komentár", "komentáre", "komentárov")}
             </button>
-            {editing && (
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => {
-                  setEditing(null);
+          )}
+          {composing && (
+            <form
+              className="cz-comment-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!text.trim()) return;
+                if (
+                  await run("saveComment", {
+                    id: editing?.id,
+                    activityId: a.id,
+                    body: text,
+                  })
+                ) {
                   setText("");
-                }}
+                  setEditing(null);
+                }
+              }}
+            >
+              <label className="sr-only" htmlFor={`comment-${a.id}`}>
+                Komentár
+              </label>
+              <input
+                ref={input}
+                id={`comment-${a.id}`}
+                maxLength={1000}
+                placeholder={editing ? "Upraviť komentár…" : "Pridať komentár…"}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                required
+              />
+              <button
+                className="cz-send"
+                disabled={busy || !text.trim()}
+                aria-label="Uložiť komentár"
               >
-                Zrušiť
+                <Send size={18} />
               </button>
-            )}
-          </form>
+              {editing && (
+                <button
+                  type="button"
+                  className="cz-link"
+                  onClick={() => {
+                    setEditing(null);
+                    setText("");
+                  }}
+                >
+                  Zrušiť
+                </button>
+              )}
+            </form>
+          )}
         </div>
       )}
       {error && (
-        <p role="alert" className="error">
+        <p role="alert" className="error cz-error">
           {error}
         </p>
       )}
@@ -326,69 +435,134 @@ function FeedCard({
     </article>
   );
 }
+
+const PAGE = 20;
+
 export default function Feed({
   state,
   activities,
   onEdit,
   onAction,
-  compact = false,
-  limit,
   allowModeration = true,
-  personal = false,
+  onPerson,
+  stream = false,
+  emptyTitle = "Zatiaľ bez zápisu",
 }: {
   state: AppState;
   activities: Activity[];
   onEdit: (a: Activity) => void;
   onAction: Action;
-  compact?: boolean;
-  limit?: number;
   allowModeration?: boolean;
-  personal?: boolean;
+  onPerson?: (memberId: string) => void;
+  /** Group stream: day dividers, filters and paging. */
+  stream?: boolean;
+  emptyTitle?: string;
 }) {
   const [person, setPerson] = useState(""),
     [type, setType] = useState(""),
     [from, setFrom] = useState(""),
-    [to, setTo] = useState("");
-  const visible = activities
-    .filter(
-      (a) =>
-        (!person || a.memberId === person) &&
-        (!type || a.typeId === type) &&
-        (!from || a.date >= from) &&
-        (!to || a.date <= to),
-    )
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
-    );
+    [to, setTo] = useState(""),
+    [filtersOpen, setFiltersOpen] = useState(false),
+    [limit, setLimit] = useState(PAGE);
+  const visible = useMemo(
+    () =>
+      activities
+        .filter(
+          (a) =>
+            (!person || a.memberId === person) &&
+            (!type || a.typeId === type) &&
+            (!from || a.date >= from) &&
+            (!to || a.date <= to),
+        )
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(a.date) ||
+            b.createdAt.localeCompare(a.createdAt),
+        ),
+    [activities, person, type, from, to],
+  );
+  const filterCount = [person, type, from, to].filter(Boolean).length;
+  const shown = stream ? visible.slice(0, limit) : visible;
+  const days: { date: string; items: Activity[] }[] = [];
+  for (const activity of shown) {
+    const last = days[days.length - 1];
+    if (last && last.date === activity.date) last.items.push(activity);
+    else days.push({ date: activity.date, items: [activity] });
+  }
+  const card = (a: Activity) => (
+    <FeedCard
+      key={a.id}
+      activity={a}
+      state={state}
+      onEdit={onEdit}
+      onAction={onAction}
+      allowModeration={allowModeration}
+      onPerson={onPerson}
+    />
+  );
   return (
-    <section className="feed-section">
-      <div className="section-head">
-        <div>
-          <p className="eyebrow">
-            {personal ? "TVOJE ZÁPISY" : "SPOLU NA CESTE"}
-          </p>
-          <h2>
-            {personal
-              ? "Tvoje aktivity"
-              : limit
-                ? "Posledné zápisy"
-                : compact
-                  ? "Zápisy"
-                  : "Denník skupiny"}
-          </h2>
+    <section className={`cz-feed ${stream ? "stream" : "list"}`}>
+      {stream && (
+        <div className="cz-feed-tools">
+          <button
+            type="button"
+            className={`cz-chip-button ${filterCount ? "active" : ""}`}
+            onClick={() => setFiltersOpen(true)}
+          >
+            <SlidersHorizontal size={16} />
+            {filterCount ? `Filter (${filterCount})` : "Filtrovať"}
+          </button>
+          {filterCount > 0 && (
+            <button
+              type="button"
+              className="cz-link"
+              onClick={() => {
+                setPerson("");
+                setType("");
+                setFrom("");
+                setTo("");
+              }}
+            >
+              Zrušiť filter
+            </button>
+          )}
         </div>
-        <span className="pill neutral">{visible.length} zápisov</span>
-      </div>
-      {!compact && (
-        <div className="filters">
-          {!personal && (
-            <>
-              <label className="sr-only" htmlFor="feed-person">
-                Človek
-              </label>
+      )}
+      {visible.length === 0 ? (
+        <Empty title={filterCount ? "Filtru nič nezodpovedá" : emptyTitle}>
+          {filterCount
+            ? "Skús zrušiť alebo zmeniť filter."
+            : "Keď pribudnú aktivity, nájdeš ich tu."}
+        </Empty>
+      ) : stream ? (
+        <>
+          {days.map((day) => (
+            <div key={day.date} className="cz-day">
+              <h3 className="cz-day-label">
+                {dayLabel(day.date, state.today)}
+              </h3>
+              <div className="cz-day-cards">{day.items.map(card)}</div>
+            </div>
+          ))}
+          {visible.length > shown.length && (
+            <button
+              type="button"
+              className="button secondary cz-more-button"
+              onClick={() => setLimit(limit + PAGE)}
+            >
+              Zobraziť staršie ({visible.length - shown.length})
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="cz-day-cards">{shown.map(card)}</div>
+      )}
+      {filtersOpen && (
+        <Modal title="Filtrovať aktivity" onClose={() => setFiltersOpen(false)}>
+          <div className="stack">
+            <label className="field">
+              Človek
               <select
-                id="feed-person"
                 value={person}
                 onChange={(e) => setPerson(e.target.value)}
               >
@@ -399,74 +573,65 @@ export default function Feed({
                   </option>
                 ))}
               </select>
-            </>
-          )}
-          <label className="sr-only" htmlFor="feed-type">
-            Typ aktivity
-          </label>
-          <select
-            id="feed-type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-          >
-            <option value="">Všetky aktivity</option>
-            {state.types
-              .filter((t) => !t.hidden)
-              .map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-          </select>
-          <label className="date-filter">
-            Od
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </label>
-          <label className="date-filter">
-            Do
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </label>
-          {(person || type || from || to) && (
-            <button
-              className="text-button"
-              onClick={() => {
-                setPerson("");
-                setType("");
-                setFrom("");
-                setTo("");
-              }}
-            >
-              Zrušiť filtre
-            </button>
-          )}
-        </div>
-      )}
-      {visible.length === 0 ? (
-        <Empty title="Zatiaľ bez zápisu">
-          Keď pribudnú aktivity, nájdeš ich tu. Prázdny denník nehovorí nič o
-          tom, koľko sa kto hýbal.
-        </Empty>
-      ) : (
-        <div className="feed-list">
-          {(limit ? visible.slice(0, limit) : visible).map((a) => (
-            <FeedCard
-              key={a.id}
-              activity={a}
-              state={state}
-              onEdit={onEdit}
-              onAction={onAction}
-              allowModeration={allowModeration}
-            />
-          ))}
-        </div>
+            </label>
+            <label className="field">
+              Typ aktivity
+              <select value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="">Všetky aktivity</option>
+                {state.types
+                  .filter((t) => !t.hidden)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <div className="grid-two">
+              <label className="field">
+                Od
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Do
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => {
+                  setPerson("");
+                  setType("");
+                  setFrom("");
+                  setTo("");
+                }}
+              >
+                Zrušiť filter
+              </button>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => {
+                  setLimit(PAGE);
+                  setFiltersOpen(false);
+                }}
+              >
+                Zobraziť {visible.length}{" "}
+                {plural(visible.length, "zápis", "zápisy", "zápisov")}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </section>
   );

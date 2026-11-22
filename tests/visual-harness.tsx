@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Activity, AppState } from "../lib/types";
 import { appPath } from "../lib/paths";
-import Group from "../components/Group";
+import Overview from "../components/Overview";
 import ErrorBoundary from "../components/ErrorBoundary";
 import AdminPanel, { type AdminData } from "../components/AdminPanel";
 import Stats from "../components/Stats";
@@ -14,6 +14,7 @@ import ActivityForm from "../components/ActivityForm";
 import Squirrel from "../components/Squirrel";
 import { Plus } from "lucide-react";
 import "../app/globals.css";
+import "../app/redesign.css";
 function VisualHarness() {
   const [fixture, setFixture] = useState<{
       participant: AppState;
@@ -142,7 +143,7 @@ function VisualHarness() {
             />
           )}{" "}
           {view === "group" && (
-            <Group
+            <Overview
               state={visualState}
               onEdit={(a) => setForm(a)}
               onAction={rejectWrite}
