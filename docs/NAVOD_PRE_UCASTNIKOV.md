@@ -30,7 +30,7 @@ Vyber typ, deň (**Dnes**, **Včera** alebo **Iný deň**) a prípadne trvanie, 
 
 ![Prehľad](../public/navod/4-prehlad.webp)
 
-Jeden riadok na človeka a 7 políčok týždňa, zoradené podľa prezývky. Hore prepneš **Týždeň / Mesiac**; appka si voľbu zapamätá. Klepnutím na políčko otvoríš deň, na meno celú prípravu človeka.
+Jeden riadok na človeka a 7 políčok týždňa, zoradené podľa prezývky. Hore prepneš **Týždeň / Mesiac**; appka si voľbu zapamätá. Potiahnutím prstom doprava sa posunieš o týždeň späť. Rohy políčka: vločka = otužovanie, fotoaparát = fotka, bublina = komentár, červené srdiečko = tvoja podpora. Klepnutím na políčko otvoríš deň, na meno celú prípravu človeka.
 
 ## 5. Výzvy a odmeny
 
@@ -46,7 +46,7 @@ Keď organizátor sprístupní otužovanie, v okne **Nový zápis** pribudne ria
 
 ![Ja](../public/navod/6-ja.webp)
 
-Tvoj týždeň alebo mesiac, podrobné štatistiky, tvoje zápisy a nastavenia: profil a fotka, **Upozornenia na telefóne**, heslo, návod a odhlásenie.
+Hore je **Appka na ploche** (tlačidlo **Nainštalovať**) a **Upozornenia** (tlačidlo **Zapnúť**). Upozornenie príde na správu organizátorov a keď niekto podporí alebo okomentuje tvoju aktivitu; klepnutím sa otvorí priamo aktivita. Ďalej je tvoj týždeň alebo mesiac, podrobné štatistiky, tvoje zápisy a nastavenia: profil a fotka, **Upozornenia na telefóne**, heslo, návod a odhlásenie.
 
 **Aplikácia na ploche:** Android — ponuka prehliadača → **Nainštalovať aplikáciu** / **Pridať na plochu**. iPhone — Safari → **Zdieľať → Pridať na plochu**; upozornenia zapni po otvorení cez novú ikonu.
 

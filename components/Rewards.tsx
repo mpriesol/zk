@@ -55,7 +55,7 @@ export function RuleCard({
         <AwardArt earned={p.complete} visual={r.visual} rewardKey={r.key} />
         <div>
           <span className="cz-kicker">
-            {r.period === "week" ? "Týždenná odmena" : "Raz za prípravu"}
+            {r.period === "week" ? "Týždenná odmena" : "Odmena za prípravu"}
           </span>
           <h3>{r.name}</h3>
         </div>
@@ -65,7 +65,12 @@ export function RuleCard({
           </span>
         )}
       </div>
-      <p>{r.description}</p>
+      <p>{r.description.replace(/\s*Raz za (týždeň|prípravu)\.?\s*$/i, "")}</p>
+      <p className="cz-periodicity">
+        {r.period === "week"
+          ? "Tento diamant môžeš získať raz za týždeň."
+          : "Tento diamant môžeš získať raz za celú prípravu."}
+      </p>
       {r.key === "variety" &&
         combination.length === 2 &&
         footPart?.kind === "activities" &&

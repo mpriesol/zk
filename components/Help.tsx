@@ -15,7 +15,7 @@ const steps = [
   ],
   [
     "Prehľad skupiny",
-    "V Prehľade je jeden riadok na človeka a 7 políčok týždňa, ľudia sú zoradení podľa prezývky. Medzi týždňom a mesiacom prepneš hore, appka si voľbu zapamätá. Klepnutím na políčko otvoríš daný deň.",
+    "V Prehľade je jeden riadok na človeka a 7 políčok týždňa, ľudia sú zoradení podľa prezývky. Medzi týždňom a mesiacom prepneš hore; potiahnutím prstom doprava sa posunieš o týždeň späť, doľava dopredu. V rohoch políčka je vločka (otužovanie), fotoaparát (fotka), bublina (komentár) a červené srdiečko, ak si aktivitu podporil(a). Klepnutím na políčko otvoríš daný deň.",
   ],
   [
     "Výzvy a odmeny",
@@ -27,7 +27,7 @@ const steps = [
   ],
   [
     "Ja: tvoja príprava",
-    "V Ja je tvoj týždeň alebo mesiac, podrobné štatistiky, tvoje zápisy a nastavenia: profil a fotka, upozornenia na telefóne, heslo, návod a odhlásenie. Organizátor tu nájde aj Administráciu.",
+    "V Ja hore nájdeš Appku na ploche a Upozornenia: každé zapneš jedným tlačidlom. Upozornenie príde na správu organizátorov a keď niekto podporí alebo okomentuje tvoju aktivitu; klepnutím sa otvorí priamo daná aktivita. Ďalej je tvoj týždeň alebo mesiac, štatistiky, tvoje zápisy a nastavenia. Organizátor tu nájde aj Administráciu.",
   ],
   [
     "Správy a appka na ploche",

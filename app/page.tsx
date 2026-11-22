@@ -86,7 +86,8 @@ export default function Page() {
     [participantView, setParticipantView] = useState(false),
     [notice, setNotice] = useState(""),
     [selectedDay, setSelectedDay] = useState<string | null>(null),
-    [openedMessage, setOpenedMessage] = useState<string | null>(null);
+    [openedMessage, setOpenedMessage] = useState<string | null>(null),
+    [focusActivity, setFocusActivity] = useState<string | null>(null);
   const account = useRef<string | null>(null);
   const attemptedInvite = useRef<string | null>(null);
   const navigate = useCallback((target: string) => {
@@ -98,6 +99,9 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.set("view", next);
     url.searchParams.delete("message");
+    url.searchParams.delete("activity");
+    url.searchParams.delete("comment");
+    setFocusActivity(null);
     if (next !== "admin") {
       url.searchParams.delete("section");
       url.searchParams.delete("request");
@@ -203,7 +207,11 @@ export default function Page() {
       setOpenedMessage(u.searchParams.get("message"));
     } else {
       const next = normalizeView(u.searchParams.get("view"));
-      if (next) {
+      if (u.searchParams.get("activity")) {
+        setView("spolu");
+        setLastMain("spolu");
+        setFocusActivity(u.searchParams.get("activity"));
+      } else if (next) {
         setView(next);
         if (MAIN_VIEWS.includes(next)) setLastMain(next);
       }
@@ -253,8 +261,9 @@ export default function Page() {
         );
         if (!target) return;
         history.replaceState(null, "", url);
-        setView(target);
+        setView(url.searchParams.get("activity") ? "spolu" : target);
         setOpenedMessage(url.searchParams.get("message"));
+        setFocusActivity(url.searchParams.get("activity"));
         void refresh().catch((e) => setError(e.message));
       } catch {
         /* Ignore invalid cross-app notification targets. */
@@ -579,6 +588,7 @@ export default function Page() {
           {activeView === "spolu" && (
             <Together
               state={state}
+              focusActivity={focusActivity}
               onEdit={setForm}
               onAction={action}
               allowModeration={!participantView}
@@ -753,7 +763,6 @@ function Profile({
   onRefresh: () => Promise<void>;
 }) {
   const [name, setName] = useState(state.me.nickname),
-    [animations, setAnimations] = useState(state.me.animations),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   return (
@@ -779,7 +788,7 @@ function Profile({
             e.preventDefault();
             setBusy(true);
             try {
-              await action("saveProfile", { nickname: name, animations });
+              await action("saveProfile", { nickname: name, animations: true });
               setMessage("Nastavenia sú uložené.");
             } catch (e) {
               setMessage(
@@ -800,20 +809,9 @@ function Profile({
               required
             />
           </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={animations}
-              onChange={(e) => setAnimations(e.target.checked)}
-            />
-            <span>
-              Povoliť medvedíka a oslavy odmien
-              <small>Správy a odmeny ostávajú dostupné aj bez animácií.</small>
-            </span>
-          </label>
           <div className="button-row">
             <button className="button primary" disabled={busy}>
-              {busy ? "Ukladám…" : "Uložiť nastavenia"}
+              {busy ? "Ukladám…" : "Uložiť prezývku"}
             </button>
             <button className="text-button" type="button" onClick={onLogout}>
               Odhlásiť sa

@@ -44,7 +44,8 @@ export default function MediaPicker({
         <span className="small muted">{items.length}/5</span>
       </div>
       <p className="small muted">
-        Najviac 5 fotografií · JPEG, PNG, WebP · do 10 MB na fotografiu.
+        Najviac 5 fotografií. Veľké fotky z mobilu appka pred odoslaním sama
+        zmenší.
       </p>
       {items.length > 0 && (
         <div className="media-selection-grid">

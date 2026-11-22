@@ -325,3 +325,118 @@ test("legacy unscoped subscription requires explicit re-enrolment and never rece
   assert.equal(calls, 0);
   assert.equal(f.db.count("subscriptions"), 0);
 });
+
+async function socialFixture(t: test.TestContext) {
+  const f = await fixture(t, 1);
+  const at = "2026-10-25T12:00:00.000Z";
+  await run(
+    f.db,
+    "INSERT INTO members(id,course_id,user_id,email,nickname,role,active,animations,joined_at) VALUES(?,?,?,?,?,?,1,1,?)",
+    "friend",
+    "c",
+    "u2",
+    "f@example.test",
+    "Dana",
+    "participant",
+    at,
+  );
+  await run(
+    f.db,
+    "INSERT INTO activity_types(id,course_id,name,group_name,hidden,active) VALUES(?,?,?,?,0,1)",
+    "hike",
+    "c",
+    "Turistika",
+    "foot",
+  );
+  await run(
+    f.db,
+    "INSERT INTO activities(id,course_id,member_id,type_id,date,minutes,distance,note,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    "act",
+    "c",
+    "m",
+    "hike",
+    "2026-10-24",
+    90,
+    null,
+    "",
+    at,
+    at,
+    "k",
+  );
+  await run(f.db, "DELETE FROM outbox");
+  const social = async (id: string, reference: string, payload: object) =>
+    run(
+      f.db,
+      "INSERT INTO outbox(id,course_id,member_id,kind,reference_id,payload,status,attempts,next_attempt,created_at) VALUES(?,?,?,?,?,?,'pending',0,?,?)",
+      id,
+      "c",
+      "m",
+      "social",
+      reference,
+      JSON.stringify(payload),
+      at,
+      at,
+    );
+  return { ...f, social };
+}
+
+test("support notice reaches the activity author; withdrawn support is not sent", async (t) => {
+  const f = await socialFixture(t);
+  await run(
+    f.db,
+    "INSERT INTO reactions(id,activity_id,member_id) VALUES(?,?,?)",
+    "r1",
+    "act",
+    "friend",
+  );
+  await f.social("like", "reaction:act:friend", {
+    type: "reaction",
+    activityId: "act",
+    actorId: "friend",
+  });
+  let calls = 0;
+  const transport = (async () => {
+    calls++;
+    return new Response(null, { status: 201 });
+  }) as typeof fetch;
+  assert.equal((await drainOutbox(f.db, f.config, transport)).accepted, 1);
+  assert.equal(calls, 1);
+  await run(f.db, "DELETE FROM reactions");
+  await f.social("like2", "reaction:act:friend:2", {
+    type: "reaction",
+    activityId: "act",
+    actorId: "friend",
+  });
+  assert.equal((await drainOutbox(f.db, f.config, transport)).cancelled, 1);
+  assert.equal(calls, 1);
+});
+
+test("comment notice is cancelled when the comment or activity is gone", async (t) => {
+  const f = await socialFixture(t);
+  await run(
+    f.db,
+    "INSERT INTO comments(id,activity_id,member_id,body,created_at) VALUES(?,?,?,?,?)",
+    "c1",
+    "act",
+    "friend",
+    "Krásna túra!",
+    "2026-10-25T12:00:00.000Z",
+  );
+  await f.social("comment", "comment:c1", {
+    type: "comment",
+    activityId: "act",
+    commentId: "c1",
+    actorId: "friend",
+  });
+  await f.social("missing", "comment:c2", {
+    type: "comment",
+    activityId: "act",
+    commentId: "c2",
+    actorId: "friend",
+  });
+  const transport = (async () =>
+    new Response(null, { status: 201 })) as typeof fetch;
+  const result = await drainOutbox(f.db, f.config, transport);
+  assert.equal(result.accepted, 1);
+  assert.equal(result.cancelled, 1);
+});

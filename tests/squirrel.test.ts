@@ -16,24 +16,19 @@ test("squirrel: welcome shown only once; reopening does not replay seen event", 
   assert.deepEqual(chooseSquirrelEvent(s, [], 0)?.ids, ["welcome"]);
   assert.equal(chooseSquirrelEvent(s, ["welcome"], 0), null);
 });
-test("squirrel: grouped rewards, own account only, seen ids remain suppressed", () => {
+test("squirrel: rewards are announced only by the celebration, never again by the squirrel", () => {
   const s = state();
   s.awards = [
     { id: "one", memberId: "me" },
     { id: "two", memberId: "me" },
-    { id: "other", memberId: "other" },
   ] as Award[];
-  const event = chooseSquirrelEvent(s, ["welcome"], 0)!;
-  assert.deepEqual(event.ids, ["a-one", "a-two"]);
-  assert.equal(chooseSquirrelEvent(s, ["welcome", ...event.ids], 1), null);
+  assert.equal(chooseSquirrelEvent(s, ["welcome"], 0), null);
 });
-test("squirrel: strict session cap, forms, reduced-motion and settings suppress events", () => {
+test("squirrel: strict session cap, forms and reduced-motion suppress events", () => {
   const s = state();
   assert.equal(chooseSquirrelEvent(s, [], 2), null);
   assert.equal(chooseSquirrelEvent(s, [], 0, { blocked: true }), null);
   assert.equal(chooseSquirrelEvent(s, [], 0, { reduced: true }), null);
-  s.me.animations = false;
-  assert.equal(chooseSquirrelEvent(s, [], 0), null);
 });
 test("squirrel: hidden/draft tasks never become events or counts", () => {
   const s = state();
