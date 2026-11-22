@@ -13,22 +13,13 @@ export function chooseSquirrelEvent(
     reduced = false,
   }: { blocked?: boolean; reduced?: boolean } = {},
 ): SquirrelEvent | null {
-  if (
-    blocked ||
-    reduced ||
-    !state.me.animations ||
-    count >= state.course.squirrelLimit
-  )
-    return null;
+  if (blocked || reduced || count >= state.course.squirrelLimit) return null;
   const messages = state.messages.filter(
     (m) =>
       m.status === "sent" &&
       m.important &&
       !m.readAt &&
       !seen.includes(`m-${m.id}`),
-  );
-  const awards = state.awards.filter(
-    (a) => a.memberId === state.me.id && !seen.includes(`a-${a.id}`),
   );
   const challenges = state.challenges.filter(
     (c) =>
@@ -42,15 +33,6 @@ export function chooseSquirrelEvent(
       ids: messages.map((m) => `m-${m.id}`),
       text: "Máš dôležitú správu od organizátorov.",
       view: "messages",
-    };
-  if (awards.length)
-    return {
-      ids: awards.map((a) => `a-${a.id}`),
-      text:
-        awards.length === 1
-          ? "Do tvojej zbierky pribudol drahokam."
-          : `Do tvojej zbierky pribudli ${awards.length} odmeny.`,
-      view: "challenges",
     };
   if (challenges.length)
     return {

@@ -11,6 +11,7 @@ import type { Activity, AppState, Member } from "../lib/types";
 import { Avatar, SportIcon, fmt, add, monday, type Action } from "./ui";
 import Feed, { plural } from "./Feed";
 import { MemberDetail } from "./Overview";
+import { SetupReminder } from "./AppSetup";
 
 function TodaySummary({
   state,
@@ -176,6 +177,7 @@ export default function Together({
   allowModeration,
   onMessage,
   onNavigate,
+  focusActivity = null,
 }: {
   state: AppState;
   onEdit: (a: Activity) => void;
@@ -183,7 +185,10 @@ export default function Together({
   allowModeration: boolean;
   onMessage: (id: string) => void;
   onNavigate: (view: string) => void;
+  focusActivity?: string | null;
 }) {
+  const missingFocus =
+    !!focusActivity && !state.activities.some((a) => a.id === focusActivity);
   const [detail, setDetail] = useState<{
     member: Member;
     date?: string;
@@ -246,6 +251,7 @@ export default function Together({
           {archiveError}
         </p>
       )}
+      <SetupReminder state={state} onOpen={() => onNavigate("ja#appka")} />
       <TodaySummary
         state={state}
         onPerson={openPerson}
@@ -260,8 +266,14 @@ export default function Together({
           </a>
         </p>
       )}
+      {missingFocus && (
+        <p className="info-note" role="status">
+          Táto aktivita už nie je dostupná. Možno ju autor medzitým zmazal.
+        </p>
+      )}
       <Feed
         stream
+        focusId={focusActivity}
         state={state}
         activities={state.activities}
         onEdit={onEdit}

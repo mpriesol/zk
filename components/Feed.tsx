@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Heart,
   MessageCircle,
@@ -61,6 +61,7 @@ export function FeedCard({
   allowModeration,
   onPerson,
   expanded = false,
+  focused = false,
 }: {
   activity: Activity;
   state: AppState;
@@ -69,6 +70,8 @@ export function FeedCard({
   allowModeration: boolean;
   onPerson?: (memberId: string) => void;
   expanded?: boolean;
+  /** Opened from a notification: scroll here, highlight, show the discussion. */
+  focused?: boolean;
 }) {
   const [showAll, setShowAll] = useState(expanded),
     [composing, setComposing] = useState(expanded),
@@ -79,6 +82,24 @@ export function FeedCard({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const article = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!focused) return;
+    setShowAll(true);
+    setComposing(true);
+    const timer = setTimeout(
+      () =>
+        article.current?.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? "auto"
+            : "smooth",
+          block: "start",
+        }),
+      120,
+    );
+    return () => clearTimeout(timer);
+  }, [focused]);
   async function run(action: string, data: Record<string, unknown>) {
     setBusy(true);
     setError("");
@@ -118,7 +139,11 @@ export function FeedCard({
       void run("deleteActivity", { id: a.id });
   }
   return (
-    <article className="cz-card">
+    <article
+      ref={article}
+      id={`activity-${a.id}`}
+      className={`cz-card ${focused ? "focused" : ""}`}
+    >
       <header className="cz-card-head">
         <button
           type="button"
@@ -229,6 +254,11 @@ export function FeedCard({
         <div className="cz-social">
           {reactions.length > 0 ? (
             <span className="cz-supporters">
+              <Heart
+                size={14}
+                className="cz-supporters-heart"
+                aria-label="Podporili"
+              />
               <span className="cz-stack" aria-hidden="true">
                 {reactions.slice(0, 3).map((id) => {
                   const m = state.members.find((member) => member.id === id);
@@ -281,7 +311,7 @@ export function FeedCard({
       {(visibleComments.length > 0 || composing) && (
         <div className="cz-comments">
           {visibleComments.map((c) => (
-            <div key={c.id} className="cz-comment">
+            <div key={c.id} className="cz-comment" id={`comment-${c.id}`}>
               <Avatar
                 name={c.nickname}
                 size="tiny"
@@ -447,6 +477,7 @@ export default function Feed({
   onPerson,
   stream = false,
   emptyTitle = "Zatiaľ bez zápisu",
+  focusId,
 }: {
   state: AppState;
   activities: Activity[];
@@ -457,6 +488,7 @@ export default function Feed({
   /** Group stream: day dividers, filters and paging. */
   stream?: boolean;
   emptyTitle?: string;
+  focusId?: string | null;
 }) {
   const [person, setPerson] = useState(""),
     [type, setType] = useState(""),
@@ -482,7 +514,10 @@ export default function Feed({
     [activities, person, type, from, to],
   );
   const filterCount = [person, type, from, to].filter(Boolean).length;
-  const shown = stream ? visible.slice(0, limit) : visible;
+  const focusIndex = focusId ? visible.findIndex((a) => a.id === focusId) : -1;
+  const shown = stream
+    ? visible.slice(0, Math.max(limit, focusIndex + 1))
+    : visible;
   const days: { date: string; items: Activity[] }[] = [];
   for (const activity of shown) {
     const last = days[days.length - 1];
@@ -498,34 +533,41 @@ export default function Feed({
       onAction={onAction}
       allowModeration={allowModeration}
       onPerson={onPerson}
+      focused={a.id === focusId}
     />
+  );
+  const tools = (
+    <span className="cz-feed-tools">
+      {filterCount > 0 && (
+        <button
+          type="button"
+          className="cz-link"
+          onClick={() => {
+            setPerson("");
+            setType("");
+            setFrom("");
+            setTo("");
+          }}
+        >
+          Zrušiť filter
+        </button>
+      )}
+      <button
+        type="button"
+        className={`cz-chip-button small ${filterCount ? "active" : ""}`}
+        onClick={() => setFiltersOpen(true)}
+      >
+        <SlidersHorizontal size={15} />
+        {filterCount ? `Filter (${filterCount})` : "Filtrovať"}
+      </button>
+    </span>
   );
   return (
     <section className={`cz-feed ${stream ? "stream" : "list"}`}>
-      {stream && (
-        <div className="cz-feed-tools">
-          <button
-            type="button"
-            className={`cz-chip-button ${filterCount ? "active" : ""}`}
-            onClick={() => setFiltersOpen(true)}
-          >
-            <SlidersHorizontal size={16} />
-            {filterCount ? `Filter (${filterCount})` : "Filtrovať"}
-          </button>
-          {filterCount > 0 && (
-            <button
-              type="button"
-              className="cz-link"
-              onClick={() => {
-                setPerson("");
-                setType("");
-                setFrom("");
-                setTo("");
-              }}
-            >
-              Zrušiť filter
-            </button>
-          )}
+      {stream && visible.length === 0 && (
+        <div className="cz-day-head">
+          <span />
+          {tools}
         </div>
       )}
       {visible.length === 0 ? (
@@ -536,11 +578,14 @@ export default function Feed({
         </Empty>
       ) : stream ? (
         <>
-          {days.map((day) => (
+          {days.map((day, index) => (
             <div key={day.date} className="cz-day">
-              <h3 className="cz-day-label">
-                {dayLabel(day.date, state.today)}
-              </h3>
+              <div className="cz-day-head">
+                <h3 className="cz-day-label">
+                  {dayLabel(day.date, state.today)}
+                </h3>
+                {index === 0 && tools}
+              </div>
               <div className="cz-day-cards">{day.items.map(card)}</div>
             </div>
           ))}

@@ -46,10 +46,13 @@ export default function PushSettings({
   publicKey,
   configured,
   api = request,
+  compact = false,
 }: {
   publicKey: string | null;
   configured: boolean;
   api?: API;
+  /** One line with a single button, used in Ja → Appka na telefóne. */
+  compact?: boolean;
 }) {
   const [registration, setRegistration] =
     useState<ServiceWorkerRegistration | null>(null);
@@ -175,7 +178,9 @@ export default function PushSettings({
       await api("pushSubscribe", { subscription: subscription.toJSON() });
       setHasSubscription(true);
       setEnabled(true);
-      setNotice("Toto zariadenie je prihlásené na upozornenia organizátora.");
+      setNotice(
+        "Hotovo. Na tomto zariadení ti prídu správy organizátorov, podpora a komentáre k tvojim aktivitám.",
+      );
     } catch (cause) {
       if (created) await created.unsubscribe().catch(() => false);
       setEnabled(false);
@@ -209,12 +214,60 @@ export default function PushSettings({
       setBusy(false);
     }
   }
+  if (compact) {
+    const canEnable =
+      supported && !needsInstall && configured && permission !== "denied";
+    return (
+      <div className="cz-setup-row">
+        <span>
+          <strong>Upozornenia</strong>
+          <small>
+            {checking
+              ? "Overujem…"
+              : enabled
+                ? "Zapnuté na tomto zariadení"
+                : needsInstall
+                  ? "Na iPhone najprv pridaj appku na plochu"
+                  : permission === "denied"
+                    ? "Zablokované v nastaveniach prehliadača"
+                    : !configured
+                      ? "Organizátor ich ešte nezapol"
+                      : !supported
+                        ? "Tento prehliadač ich nepodporuje"
+                        : "Správy, podpora a komentáre"}
+          </small>
+          {error && (
+            <small role="alert" className="form-error">
+              {error}
+            </small>
+          )}
+        </span>
+        {enabled ? (
+          <span className="cz-setup-ok" aria-hidden="true">
+            ✓
+          </span>
+        ) : (
+          canEnable && (
+            <button
+              type="button"
+              className="button primary cz-setup-button"
+              onClick={subscribe}
+              disabled={busy || !registration || checking}
+            >
+              {busy ? "Zapínam…" : "Zapnúť"}
+            </button>
+          )
+        )}
+      </div>
+    );
+  }
   return (
     <section className="push-settings" aria-labelledby="push-heading">
-      <h3 id="push-heading">Upozornenia od organizátora</h3>
+      <h3 id="push-heading">Upozornenia na tomto zariadení</h3>
       <p>
-        Dobrovoľné upozornenia na tomto zariadení. Žiadne pripomienky
-        neaktivity. Všetky správy ostávajú dostupné aj pod zvončekom.
+        Dobrovoľné upozornenia: správy organizátorov a podpora alebo komentár k
+        tvojej aktivite. Žiadne pripomienky neaktivity. Všetko ostáva dostupné
+        aj v aplikácii.
       </p>
       {checking ? (
         <p role="status">Overujem podporu zariadenia…</p>

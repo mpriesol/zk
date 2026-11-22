@@ -17,7 +17,6 @@ export default function Squirrel({
     if (
       peek ||
       blocked ||
-      !state.me.animations ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
@@ -60,8 +59,8 @@ export default function Squirrel({
     return () => clearTimeout(timeout);
   }, [peek]);
   useEffect(() => {
-    if (blocked || !state.me.animations) setPeek(null);
-  }, [blocked, state.me.animations]);
+    if (blocked) setPeek(null);
+  }, [blocked]);
   useEffect(() => {
     const hideOnInput = () => {
       if (

@@ -6,6 +6,7 @@ import {
   type SendResult,
 } from "./push.ts";
 import type { ServerConfig } from "./server.ts";
+import { appPath, basePathFromUrl } from "./paths.ts";
 
 type Delivery = {
   status: "accepted" | "expired" | "retry" | "failed" | "cancelled";
@@ -203,44 +204,68 @@ export async function drainOutbox(
         );
         continue;
       }
-      if (job.kind !== "push") {
+      if (job.kind !== "push" && job.kind !== "social") {
         await finish("failed", "Neznámy kanál odosielania.");
         continue;
       }
-      const recipient = await one(
-        db,
-        "SELECT r.id,m.data FROM recipients r JOIN messages m ON m.id=r.message_id WHERE r.message_id=? AND r.member_id=? AND m.course_id=? AND m.status='sent'",
-        job.reference_id,
-        job.member_id,
-        job.course_id,
-      );
-      if (!recipient) {
-        await finish(
-          "cancelled",
-          "Správa už nie je sprístupnená tomuto členovi.",
-        );
-        continue;
-      }
-      const message = decode(recipient.data);
-      const membershipNotice = message.kind === "membership_request";
-      if (membershipNotice && member.role !== "admin") {
-        await finish(
-          "cancelled",
-          "Organizátorské oprávnenie už nie je aktívne.",
-        );
-        continue;
-      }
-      if (
-        membershipNotice &&
-        !(await one(
+      let membershipNotice = false;
+      let notice: {
+        messageId: string;
+        title: string;
+        body: string;
+        url?: string;
+      };
+      if (job.kind === "social") {
+        const social = await socialNotice(db, job, payload, cfg);
+        if (typeof social === "string") {
+          await finish("cancelled", social);
+          continue;
+        }
+        notice = social;
+      } else {
+        const recipient = await one(
           db,
-          "SELECT id FROM membership_requests WHERE id=? AND course_id=? AND status='pending'",
-          message.requestId,
+          "SELECT r.id,m.data FROM recipients r JOIN messages m ON m.id=r.message_id WHERE r.message_id=? AND r.member_id=? AND m.course_id=? AND m.status='sent'",
+          job.reference_id,
+          job.member_id,
           job.course_id,
-        ))
-      ) {
-        await finish("cancelled", "Žiadosť je už vybavená.");
-        continue;
+        );
+        if (!recipient) {
+          await finish(
+            "cancelled",
+            "Správa už nie je sprístupnená tomuto členovi.",
+          );
+          continue;
+        }
+        const message = decode(recipient.data);
+        membershipNotice = message.kind === "membership_request";
+        if (membershipNotice && member.role !== "admin") {
+          await finish(
+            "cancelled",
+            "Organizátorské oprávnenie už nie je aktívne.",
+          );
+          continue;
+        }
+        if (
+          membershipNotice &&
+          !(await one(
+            db,
+            "SELECT id FROM membership_requests WHERE id=? AND course_id=? AND status='pending'",
+            message.requestId,
+            job.course_id,
+          ))
+        ) {
+          await finish("cancelled", "Žiadosť je už vybavená.");
+          continue;
+        }
+        notice = {
+          messageId: job.reference_id,
+          title: "Cestou Zimy",
+          body: membershipNotice
+            ? "Nový člen čaká na schválenie. Otvor administráciu."
+            : "Organizátor ti poslal novú správu. Otvor ju v aplikácii.",
+          ...(membershipNotice ? { url: String(message.link || "") } : {}),
+        };
       }
       const allSubscriptions = await rows(
         db,
@@ -356,14 +381,7 @@ export async function drainOutbox(
         try {
           result = await sendPush(
             decode(subscription.data),
-            {
-              messageId: job.reference_id,
-              title: "Cestou Zimy",
-              body: membershipNotice
-                ? "Nový člen čaká na schválenie. Otvor administráciu."
-                : "Organizátor ti poslal novú správu. Otvor ju v aplikácii.",
-              ...(membershipNotice ? { url: String(message.link || "") } : {}),
-            },
+            notice,
             {
               publicKey: cfg.vapidPublicKey || "",
               privateKey: cfg.vapidPrivateKey || "",
@@ -432,4 +450,66 @@ export async function drainOutbox(
     }
   }
   return summary;
+}
+
+const shortDate = (date: string) =>
+  `${Number(date.slice(8, 10))}. ${Number(date.slice(5, 7))}.`;
+
+/**
+ * Support and comment notices for the author of an activity. Returns a reason
+ * string when the notice is no longer valid (activity, like or comment gone).
+ */
+async function socialNotice(
+  db: Database,
+  job: Job,
+  payload: Record<string, any>,
+  cfg: ServerConfig,
+): Promise<
+  { messageId: string; title: string; body: string; url: string } | string
+> {
+  const activity = await one(
+    db,
+    "SELECT a.id,a.member_id,a.date,t.name type_name FROM activities a JOIN activity_types t ON t.id=a.type_id WHERE a.id=? AND a.course_id=? AND t.hidden=0",
+    String(payload.activityId || ""),
+    job.course_id,
+  );
+  if (!activity || activity.member_id !== job.member_id)
+    return "Aktivita už neexistuje.";
+  const actor = await one(
+    db,
+    "SELECT nickname,active FROM members WHERE id=? AND course_id=?",
+    String(payload.actorId || ""),
+    job.course_id,
+  );
+  if (!actor?.active) return "Autor reakcie už nie je aktívny.";
+  const what = `${activity.type_name} ${shortDate(activity.date)}`;
+  let body: string;
+  let query = `activity=${encodeURIComponent(activity.id)}`;
+  if (payload.type === "comment") {
+    const comment = await one(
+      db,
+      "SELECT id,body FROM comments WHERE id=? AND activity_id=?",
+      String(payload.commentId || ""),
+      activity.id,
+    );
+    if (!comment) return "Komentár už neexistuje.";
+    const text = String(comment.body).replace(/\s+/g, " ").trim();
+    body = `${actor.nickname} komentuje tvoju aktivitu ${what}: „${text.length > 90 ? text.slice(0, 89) + "…" : text}“`;
+    query += `&comment=${encodeURIComponent(comment.id)}`;
+  } else {
+    const reaction = await one(
+      db,
+      "SELECT id FROM reactions WHERE activity_id=? AND member_id=?",
+      activity.id,
+      String(payload.actorId || ""),
+    );
+    if (!reaction) return "Podpora bola zrušená.";
+    body = `${actor.nickname} ti dáva podporu: ${what}`;
+  }
+  return {
+    messageId: `social-${job.reference_id}`.slice(0, 120),
+    title: "Cestou Zimy",
+    body,
+    url: appPath(`/?view=spolu&${query}`, basePathFromUrl(cfg.siteUrl || "")),
+  };
 }

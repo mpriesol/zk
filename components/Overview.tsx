@@ -1,10 +1,17 @@
 "use client";
-import { useState } from "react";
-import { ChevronRight, Snowflake } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Camera,
+  ChevronRight,
+  Heart,
+  MessageCircle,
+  Snowflake,
+} from "lucide-react";
 import type { AppState, Activity, Member } from "../lib/types";
 import {
   calendarBounds,
   calendarDays,
+  moveCalendar,
   type CalendarRange,
 } from "../lib/calendar";
 import { Avatar, SportIcon, fmt, add, Modal, type Action } from "./ui";
@@ -14,6 +21,86 @@ import AwardArt from "./AwardArt";
 import ColdPanel from "./ColdPanel";
 import Feed, { plural } from "./Feed";
 import Stats from "./Stats";
+
+/** Sport icons for one day: one large icon, two small ones, or two and "+N". */
+export function DayIcons({ items }: { items: Activity[] }) {
+  if (!items.length) return null;
+  if (items.length === 1)
+    return (
+      <SportIcon
+        group={items[0].group}
+        typeName={items[0].typeName}
+        size={16}
+      />
+    );
+  return (
+    <span className="cz-day-icons">
+      {items.slice(0, 2).map((a) => (
+        <SportIcon key={a.id} group={a.group} typeName={a.typeName} size={12} />
+      ))}
+      {items.length > 2 && <small>+{items.length - 2}</small>}
+    </span>
+  );
+}
+/** Corner marks: snowflake, photo, comment and own support. */
+export function DayMarks({
+  items,
+  cold,
+  meId,
+}: {
+  items: Activity[];
+  cold: boolean;
+  meId: string;
+}) {
+  const photo = items.some((a) => (a.photos?.length || 0) > 0);
+  const comment = items.some((a) => (a.comments?.length || 0) > 0);
+  const liked = items.some((a) => a.reactions?.includes(meId));
+  return (
+    <>
+      {cold && (
+        <span className="cz-mark tr cold" aria-hidden="true">
+          <Snowflake size={9} />
+        </span>
+      )}
+      {photo && (
+        <span className="cz-mark tl" aria-hidden="true">
+          <Camera size={9} />
+        </span>
+      )}
+      {comment && (
+        <span className="cz-mark bl" aria-hidden="true">
+          <MessageCircle size={9} />
+        </span>
+      )}
+      {liked && (
+        <span className="cz-mark br liked" aria-hidden="true">
+          <Heart size={9} fill="currentColor" />
+        </span>
+      )}
+    </>
+  );
+}
+/** Horizontal swipe on touch screens: right = earlier period, left = later. */
+function useSwipe(onPrevious: () => void, onNext: () => void) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  return {
+    onTouchStart: (event: React.TouchEvent) => {
+      const t = event.touches[0];
+      start.current = { x: t.clientX, y: t.clientY };
+    },
+    onTouchEnd: (event: React.TouchEvent) => {
+      const from = start.current;
+      start.current = null;
+      if (!from) return;
+      const t = event.changedTouches[0];
+      const dx = t.clientX - from.x,
+        dy = t.clientY - from.y;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx > 0) onPrevious();
+      else onNext();
+    },
+  };
+}
 
 /** One member's preparation: stats, calendar, awards and entries. */
 export function MemberDetail({
@@ -154,6 +241,21 @@ export default function Overview({
     date?: string;
   } | null>(null);
   const { start, end } = calendarBounds(range, anchor);
+  const previous = calendarBounds(range, moveCalendar(range, anchor, -1));
+  const next = calendarBounds(range, moveCalendar(range, anchor, 1));
+  const [slide, setSlide] = useState("");
+  const swipe = useSwipe(
+    () => {
+      if (previous.end < state.course.startDate) return;
+      setSlide("from-left");
+      setAnchor(moveCalendar(range, anchor, -1));
+    },
+    () => {
+      if (next.start > state.today) return;
+      setSlide("from-right");
+      setAnchor(moveCalendar(range, anchor, 1));
+    },
+  );
   const weekDays = calendarDays("week", anchor).days;
   const monthDays: string[] = [];
   for (let d = start; d <= end; d = add(d, 1)) monthDays.push(d);
@@ -204,7 +306,13 @@ export default function Overview({
         </p>
       </section>
       {range === "week" ? (
-        <section className="cz-block cz-people" aria-label="Týždeň po ľuďoch">
+        <section
+          className={`cz-block cz-people ${slide}`}
+          key={`week-${start}`}
+          aria-label="Týždeň po ľuďoch"
+          onAnimationEnd={() => setSlide("")}
+          {...swipe}
+        >
           <div className="cz-people-head" aria-hidden="true">
             <span>Podľa mena</span>
             {weekDays.map((d, i) => (
@@ -247,25 +355,14 @@ export default function Overview({
                     <button
                       type="button"
                       key={date}
-                      className={`cz-cell ${items.length ? `g-${items.length > 1 ? "mix" : group}` : "is-empty"} ${date === state.today ? "today" : ""}`}
+                      className={`cz-cell ${items.length ? `g-${items.every((a) => a.group === group) ? group : "mix"}` : "is-empty"} ${date === state.today ? "today" : ""}`}
                       disabled={date > state.today}
                       aria-label={label}
                       title={label}
                       onClick={() => setDetail({ member, date })}
                     >
-                      {items.length === 1 && (
-                        <SportIcon
-                          group={items[0].group}
-                          typeName={items[0].typeName}
-                          size={16}
-                        />
-                      )}
-                      {items.length > 1 && <b>{items.length}</b>}
-                      {cold && (
-                        <span className="cz-cell-cold" aria-hidden="true">
-                          <Snowflake size={10} />
-                        </span>
-                      )}
+                      <DayIcons items={items} />
+                      <DayMarks items={items} cold={cold} meId={state.me.id} />
                     </button>
                   );
                 })}
@@ -329,6 +426,10 @@ export default function Overview({
         </section>
       )}
       <p className="cz-legend">
+        <span className="cz-swipe-hint">
+          Potiahni prstom doľava alebo doprava pre iný{" "}
+          {range === "week" ? "týždeň" : "mesiac"}.
+        </span>
         <span>
           <i className="g-foot" /> pohyb po vlastných
         </span>
@@ -343,6 +444,16 @@ export default function Overview({
             <Snowflake size={12} /> otužovanie
           </span>
         )}
+        <span>
+          <Camera size={12} /> fotka
+        </span>
+        <span>
+          <MessageCircle size={12} /> komentár
+        </span>
+        <span>
+          <Heart size={12} fill="currentColor" className="cz-liked" /> tvoja
+          podpora
+        </span>
       </p>
       {state.cold && (
         <div className="cz-block-wrap">

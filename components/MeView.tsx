@@ -8,7 +8,6 @@ import {
   KeyRound,
   LogOut,
   Settings,
-  Snowflake,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -24,6 +23,8 @@ import { usePreference } from "./preferences";
 import ActivityCalendar, { CalendarControls } from "./ActivityCalendar";
 import Feed, { formatMinutes, plural } from "./Feed";
 import Stats from "./Stats";
+import { DayIcons, DayMarks } from "./Overview";
+import AppSetup from "./AppSetup";
 
 function MyWeek({
   state,
@@ -127,21 +128,10 @@ function MyWeek({
                 onClick={() => onDay(date)}
               >
                 <span
-                  className={`cz-dot ${items.length ? `g-${items.length > 1 ? "mix" : items[0].group}` : "is-empty"}`}
+                  className={`cz-dot ${items.length ? `g-${items.every((a) => a.group === items[0].group) ? items[0].group : "mix"}` : "is-empty"}`}
                 >
-                  {items.length === 1 && (
-                    <SportIcon
-                      group={items[0].group}
-                      typeName={items[0].typeName}
-                      size={17}
-                    />
-                  )}
-                  {items.length > 1 && <b>{items.length}</b>}
-                  {isCold && (
-                    <span className="cz-cell-cold" aria-hidden="true">
-                      <Snowflake size={10} />
-                    </span>
-                  )}
+                  <DayIcons items={items} />
+                  <DayMarks items={items} cold={isCold} meId="" />
                 </span>
                 <small>{["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}</small>
               </button>
@@ -245,7 +235,7 @@ export default function MeView({
   const shown = all ? own : own.slice(0, 5);
   const openedActivity = own.find((a) => a.id === opened);
   const settings = [
-    { view: "profil", label: "Profil, fotka a animácie", icon: UserRound },
+    { view: "profil", label: "Profil a fotka", icon: UserRound },
     {
       view: "profil#upozornenia",
       label: "Upozornenia na telefóne",
@@ -272,6 +262,7 @@ export default function MeView({
         </span>
         <ChevronRight size={20} aria-hidden="true" />
       </button>
+      <AppSetup state={state} />
       <MyWeek state={state} onDay={onDay} />
       <h2 className="cz-section-title">Moje zápisy</h2>
       <div className="cz-block cz-list">

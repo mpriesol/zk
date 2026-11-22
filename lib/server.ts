@@ -599,6 +599,38 @@ async function log(
     now,
   );
 }
+/** Push to the activity author about support or a comment, only with an enabled device. */
+async function queueSocialNotice(
+  db: Database,
+  courseId: string,
+  ownerId: string,
+  actorId: string,
+  referenceId: string,
+  payload: Record<string, unknown>,
+  now: string,
+) {
+  if (ownerId === actorId) return;
+  const device = await one(
+    db,
+    "SELECT id FROM subscriptions WHERE member_id=? AND course_id=? LIMIT 1",
+    ownerId,
+    courseId,
+  );
+  if (!device) return;
+  await run(
+    db,
+    "INSERT OR IGNORE INTO outbox(id,course_id,member_id,kind,reference_id,payload,status,attempts,next_attempt,created_at) VALUES(?,?,?,?,?,?,?,0,?,?)",
+    uid(),
+    courseId,
+    ownerId,
+    "social",
+    referenceId,
+    JSON.stringify(payload),
+    "pending",
+    now,
+    now,
+  );
+}
 async function ownedActivity(
   db: Database,
   id: unknown,
@@ -1403,7 +1435,7 @@ export async function handleRequest(
           me.id,
         );
         if (r) await run(db, "DELETE FROM reactions WHERE id=?", r.id);
-        else
+        else {
           await run(
             db,
             "INSERT OR IGNORE INTO reactions(id,activity_id,member_id) VALUES(?,?,?)",
@@ -1411,6 +1443,17 @@ export async function handleRequest(
             a.id,
             me.id,
           );
+          // One notice per supporter and activity; toggling never repeats it.
+          await queueSocialNotice(
+            db,
+            cid,
+            a.member_id,
+            me.id,
+            `reaction:${a.id}:${me.id}`,
+            { type: "reaction", activityId: a.id, actorId: me.id },
+            now,
+          );
+        }
         break;
       }
       case "saveComment": {
@@ -1426,16 +1469,32 @@ export async function handleRequest(
           if (!c || c.member_id !== me.id)
             fail(403, "Môžeš upravovať iba vlastné komentáre.");
           await run(db, "UPDATE comments SET body=? WHERE id=?", body, c.id);
-        } else
+        } else {
+          const commentId = uid();
           await run(
             db,
             "INSERT INTO comments(id,activity_id,member_id,body,created_at) VALUES(?,?,?,?,?)",
-            uid(),
+            commentId,
             a.id,
             me.id,
             body,
             now,
           );
+          await queueSocialNotice(
+            db,
+            cid,
+            a.member_id,
+            me.id,
+            `comment:${commentId}`,
+            {
+              type: "comment",
+              activityId: a.id,
+              commentId,
+              actorId: me.id,
+            },
+            now,
+          );
+        }
         break;
       }
       case "deleteComment": {
