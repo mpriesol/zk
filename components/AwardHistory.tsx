@@ -3,6 +3,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import type { Activity, Award, Condition, RuleProgress } from "../lib/types";
 import { Empty, Gem, fmt } from "./ui";
+import AwardArt from "./AwardArt";
 
 export interface AwardHistoryProps {
   awards: Award[];
@@ -107,7 +108,11 @@ export default function AwardHistory({
         return (
           <article className="reward-card complete" key={award.id}>
             <div className="reward-title">
-              <Gem earned index={gemIndexes[award.ruleKey] ?? 0} />
+              <AwardArt
+                earned
+                visual={award.visual || snapshot.visual}
+                rewardKey={award.ruleKey}
+              />
               <div>
                 <span className="eyebrow">ZÍSKANÁ ODMENA</span>
                 <h3>{snapshot.name}</h3>

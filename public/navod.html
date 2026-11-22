@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="sk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#456c61" />
+    <meta
+      name="description"
+      content="Cestou Zimy: jednoduchý návod na zapisovanie aktivít, prehľady skupiny, výzvy, vločky, správy a nastavenia."
+    />
+    <title>Krátky návod pre účastníkov · Cestou Zimy</title>
+    <style>
+      @font-face {
+        font-family: "Open Sans";
+        src: url("brand/open-sans.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Titillium Web";
+        src: url("brand/titillium-web-600.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
+      :root {
+        color-scheme: light;
+        --ink: #263e36;
+        --muted: #52685f;
+        --green: #456c61;
+        --line: #d9e4dc;
+        --paper: #ffffff;
+        --wash: #f2f6f2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--wash);
+        color: var(--ink);
+        font:
+          15px/1.7 "Open Sans",
+          Arial,
+          sans-serif;
+      }
+      a {
+        color: #315f54;
+        text-underline-offset: 3px;
+      }
+      a:focus-visible {
+        outline: 3px solid #5c8b7b;
+        outline-offset: 4px;
+        border-radius: 2px;
+      }
+      .sheet {
+        max-width: 1020px;
+        margin: 28px auto;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 34px 42px;
+      }
+      .utility {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 28px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .utility a {
+        font-weight: 600;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 23px;
+      }
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--green);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2 {
+        font-family: "Titillium Web", Arial, sans-serif;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 38px;
+        margin: 0 0 7px;
+      }
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .mountains {
+        width: 178px;
+        height: auto;
+        flex: 0 0 auto;
+      }
+      p {
+        margin: 0 0 11px;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+      .start {
+        padding: 17px 20px;
+        border-left: 4px solid #78958b;
+        background: #f3f7f3;
+        margin-bottom: 28px;
+      }
+      .start p + p {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 23px 30px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .step {
+        position: relative;
+        border-top: 1px solid var(--line);
+        padding-top: 17px;
+        break-inside: avoid;
+      }
+      .step-heading {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .step-number {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 33px;
+        width: 33px;
+        height: 33px;
+        border-radius: 10px;
+        background: #edf3ee;
+        color: var(--green);
+        font:
+          600 21px/1 "Titillium Web",
+          Arial,
+          sans-serif;
+      }
+      h2 {
+        font-size: 23px;
+        margin: 0;
+      }
+      .step p {
+        font-size: 13px;
+      }
+      .step .tip {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      strong {
+        color: #263e36;
+      }
+      .help {
+        margin-top: 28px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #f8faf8;
+        break-inside: avoid;
+      }
+      .help h2 {
+        font-size: 20px;
+        margin-bottom: 8px;
+      }
+      .help p {
+        font-size: 12px;
+      }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-top: 22px;
+        margin-top: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+      }
+      @media (max-width: 680px) {
+        body {
+          background: white;
+        }
+        .sheet {
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+          padding: 22px 21px;
+        }
+        .utility {
+          font-size: 11px;
+          flex-wrap: wrap;
+          margin-bottom: 24px;
+        }
+        .hero {
+          gap: 10px;
+        }
+        h1 {
+          font-size: 32px;
+        }
+        .subtitle {
+          font-size: 15px;
+        }
+        .mountains {
+          width: 102px;
+        }
+        .steps {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .step p {
+          font-size: 14px;
+        }
+        .step .tip {
+          font-size: 12px;
+        }
+      }
+      @page {
+        size: A4;
+        margin: 13mm;
+      }
+      @media print {
+        body {
+          background: white;
+          font-size: 10pt;
+          line-height: 1.45;
+        }
+        .sheet {
+          max-width: none;
+          margin: 0;
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+        }
+        .utility {
+          display: none;
+        }
+        .hero {
+          margin-bottom: 5mm;
+        }
+        h1 {
+          font-size: 27pt;
+        }
+        .subtitle {
+          font-size: 12pt;
+        }
+        .eyebrow {
+          font-size: 8pt;
+        }
+        .mountains {
+          width: 31mm;
+        }
+        .start {
+          margin-bottom: 5mm;
+          padding: 3mm 4mm;
+        }
+        .start p + p {
+          font-size: 8.5pt;
+        }
+        .steps {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 4mm 7mm;
+        }
+        .step {
+          padding-top: 3mm;
+        }
+        .step-heading {
+          gap: 2mm;
+          margin-bottom: 2mm;
+        }
+        .step-number {
+          width: 7mm;
+          height: 7mm;
+          flex-basis: 7mm;
+          font-size: 14pt;
+          border: 1px solid var(--line);
+          border-radius: 2mm;
+        }
+        h2 {
+          font-size: 14pt;
+        }
+        .step p {
+          font-size: 8.8pt;
+          margin-bottom: 2mm;
+        }
+        .step .tip {
+          font-size: 8pt;
+        }
+        .help {
+          margin-top: 4mm;
+          padding: 3mm 4mm;
+        }
+        .help h2 {
+          font-size: 12pt;
+        }
+        .help p {
+          font-size: 8pt;
+        }
+        .footer {
+          margin-top: 4mm;
+          padding-top: 3mm;
+          font-size: 8pt;
+        }
+        a {
+          color: inherit;
+        }
+        p {
+          orphans: 3;
+          widows: 3;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet">
+      <div class="utility">
+        <a href="./">← Otvoriť aplikáciu</a>
+        <span
+          >Na vytlačenie alebo uloženie do PDF použi ponuku prehliadača →
+          Tlačiť.</span
+        >
+      </div>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Príprava na zimný kurz</p>
+          <h1>Cestou Zimy</h1>
+          <p class="subtitle">Krátky návod pre účastníkov</p>
+        </div>
+        <img
+          class="mountains"
+          src="brand/hory_title_complete.png"
+          width="178"
+          height="107"
+          alt=""
+        />
+      </header>
+      <section class="start" aria-label="Ako začať">
+        <p>
+          Prípravu si zapisuješ svojím tempom. Na <strong>Domove</strong> nájdeš
+          svoju prípravu, vo <strong>Všetci</strong> aktivity našej skupiny.
+        </p>
+        <p>
+          <strong>Prvý príchod:</strong> otvor odkaz od organizátora a vyber
+          <strong>Prihlásiť sa</strong>, prípadne
+          <strong>Vytvoriť účet</strong>. Bez platnej pozvánky nový účet čaká na
+          schválenie; potom použi <strong>Skontrolovať schválenie</strong>. Ak
+          už účet máš, prihlás sa doň.
+        </p>
+      </section>
+      <ol class="steps">
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">1</span>
+            <h2>Začni na Domove</h2>
+          </div>
+          <p>
+            Na <strong>Domove</strong> máš svoj kalendár, prehľad pohybu,
+            posledné aktivity a zbierku odmien. Nad kalendárom prepneš
+            <strong>Týždeň / Mesiac</strong>; appka si túto voľbu zapamätá.
+            Šípkami si pozrieš staršie obdobie a cez <strong>Dnes</strong> sa
+            vrátiš k aktuálnemu.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">2</span>
+            <h2>Pridaj aktivitu</h2>
+          </div>
+          <p>
+            Na Domove stlač <strong>Pridať aktivitu</strong>, vyber druh pohybu
+            a deň. Trvanie je voliteľné: zadaj napríklad
+            <strong>90 min</strong> alebo <strong>1,5 hod</strong>; pripojiť
+            môžeš poznámku a najviac päť fotografií. Stlač
+            <strong>Uložiť aktivitu</strong> a počkaj na dokončenie.
+          </p>
+          <p class="tip">
+            Fotky: JPEG, PNG alebo WebP, do 10 MB každá. Bez trvania sa započíta
+            pohybový deň; časové podmienky odmien potrebujú vyplnené trvanie.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">3</span>
+            <h2>Otvor svoj deň</h2>
+          </div>
+          <p>
+            Klepnutím na deň v kalendári otvoríš jeho aktivity. Ikony ukazujú
+            druh pohybu, bublinka komentáre a vločka otužovanie; pri viacerých
+            aktivitách uvidíš viac ikon alebo <strong>+N</strong>. Svoj zápis
+            upravíš cez ceruzku pri aktivite a potvrdíš cez
+            <strong>Uložiť zmeny</strong>.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">4</span>
+            <h2>Pozri sa na skupinu</h2>
+          </div>
+          <p>
+            Vo <strong>Všetci → Aktivity</strong> nájdeš zápisy, fotografie a
+            komentáre vrátane svojich. Otvor komentáre, napíš povzbudenie a
+            odošli ho tlačidlom so šípkou; fotografiu môžeš zväčšiť. Vo
+            <strong>Všetci → Prehľad</strong> prepneš
+            <strong>Týždeň / Mesiac</strong> a otvoríš konkrétny deň alebo
+            prípravu človeka podľa prezývky.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">5</span>
+            <h2>Výzvy a odmeny</h2>
+          </div>
+          <p>
+            <strong>Výzvy a odmeny</strong> otvoríš zo zbierky na Domove alebo z
+            ponuky hore. Pri drahokame rozbaľ <strong>Za čo sa počíta</strong>:
+            uvidíš podmienku, obdobie aj započítané aktivity. Praktickú úlohu
+            potvrď po splnení; osobné ocenenia udeľuje organizátor a históriu
+            nájdeš v časti <strong>Získané drahokamy</strong>.
+          </p>
+          <p class="tip">
+            „Pohyb po vlastných“ je chôdza, turistika alebo beh; cvičenie je
+            samostatná skupina. Presné pravidlá sú pri konkrétnej odmene.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">6</span>
+            <h2>Pridaj vločku</h2>
+          </div>
+          <p>
+            Keď organizátor sprístupní výzvu a nastane jej začiatok, na Domove
+            sa objaví <strong>Vločka po vločke</strong>. Stlač
+            <strong>Zaznamenať otužovanie</strong>, vyber deň a
+            <strong>Studená sprcha / Otužovanie</strong>, potom
+            <strong>Pridať vločku</strong>. Jeden človek pridá jednu vločku
+            denne; otužovanie nepridáva tréningové minúty.
+          </p>
+          <p class="tip">
+            Starší záznam upravíš cez <strong>Moje vločky</strong> a ceruzku.
+            Poznámku vidíš ty a organizátori.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">7</span>
+            <h2>Správy a archív</h2>
+          </div>
+          <p>
+            Zvonček hore otvorí správy; klepnutím na názov zobrazíš celý text.
+            Zvoľ <strong>Beriem na vedomie · archivovať</strong>; pripnutú
+            správu môžeš presunúť aj priamo z Domova. Nájdeš ju v
+            <strong>Archíve</strong> a cez
+            <strong>Vrátiť medzi správy</strong> ju obnovíš; ostatným sa nič
+            nemení.
+          </p>
+        </li>
+        <li class="step">
+          <div class="step-heading">
+            <span class="step-number" aria-hidden="true">8</span>
+            <h2>Profil a upozornenia</h2>
+          </div>
+          <p>
+            Cez svoju fotografiu alebo ponuku hore otvor
+            <strong>Profil a nastavenia</strong>. Zmeníš zobrazovanú prezývku,
+            fotografiu či animácie; novú fotku potvrď cez
+            <strong>Uložiť fotografiu</strong>. V časti Upozornenia vyber
+            <strong>Zapnúť upozornenia</strong> a povoľ ich aj v systémovej
+            otázke.
+          </p>
+          <p class="tip">
+            <strong>Android:</strong> ponuka prehliadača → Nainštalovať
+            aplikáciu / Pridať na plochu. <strong>iPhone:</strong> Safari →
+            Zdieľať → Pridať na plochu; upozornenia zapni po otvorení cez novú
+            ikonu. Názvy položiek sa môžu líšiť.
+          </p>
+        </li>
+      </ol>
+      <aside class="help" aria-labelledby="help-title">
+        <h2 id="help-title">Keď sa niečo nepodarí</h2>
+        <p>
+          Prečítaj hlášku pri formulári. Neúspešné nahratie fotky môžeš
+          zopakovať alebo zvoliť
+          <strong>Uložiť bez neúspešných fotografií</strong>. Ak zabudneš heslo,
+          ozvi sa organizátorovi — poskytne ti odkaz na obnovu; svoje heslo mu
+          neposielaj.
+        </p>
+      </aside>
+      <footer class="footer">
+        <span>Cestou Zimy · každý svojím tempom</span>
+        <span
+          >Návod nájdeš aj cez <strong>Ako na to</strong> · verzia 22. 11.
+          2026</span
+        >
+      </footer>
+    </main>
+  </body>
+</html>

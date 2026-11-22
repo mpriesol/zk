@@ -21,12 +21,19 @@ import {
   Menu,
   Mountain,
   ArrowUpRight,
+  HelpCircle,
+  Snowflake,
+  Archive,
 } from "lucide-react";
 import type { Activity, AppState, Message } from "../lib/types";
 import { summarize } from "../lib/gamification";
 import { Avatar, Empty, Gem, Modal, fmt, monday, add } from "../components/ui";
 import ActivityForm from "../components/ActivityForm";
 import Feed from "../components/Feed";
+import HomeDashboard from "../components/HomeDashboard";
+import AwardCelebration from "../components/AwardCelebration";
+import AvatarEditor from "../components/AvatarEditor";
+import Help from "../components/Help";
 import Stats from "../components/Stats";
 import Group from "../components/Group";
 import Rewards, { RuleCard } from "../components/Rewards";
@@ -46,16 +53,15 @@ export const dynamic = "force-dynamic";
 const navigation = [
   { id: "home", name: "Domov", icon: Home },
   { id: "group", name: "Všetci", icon: Users },
-  { id: "challenges", name: "Výzvy", icon: Diamond },
-  { id: "me", name: "Ja", icon: UserRound },
 ];
 const titles: Record<string, string> = {
-  home: "Tvoja cesta sa začína dnes.",
+  home: "Tvoja príprava.",
   group: "Spolu sa ide ľahšie.",
-  challenges: "Malé kroky. Veľké zážitky.",
-  me: "Tvoja príprava.",
+  challenges: "Výzvy a odmeny.",
+  me: "Tvoj profil a nastavenia.",
   messages: "Správy z nášho tábora.",
   admin: "Zázemie organizátorov.",
+  help: "Ako na prípravu v appke.",
 };
 export default function Page() {
   const [state, setState] = useState<AppState | null>(null),
@@ -79,6 +85,10 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.set("view", next);
     url.searchParams.delete("message");
+    if (next !== "admin") {
+      url.searchParams.delete("section");
+      url.searchParams.delete("request");
+    }
     history.replaceState(null, "", url);
     window.scrollTo({
       top: 0,
@@ -201,11 +211,40 @@ export default function Page() {
       attemptedInvite.current = null;
       void refresh().catch((error) => setError(error.message));
     };
+    const notificationNavigate = (event: MessageEvent) => {
+      if (
+        event.data?.type !== "notification-navigate" ||
+        typeof event.data.url !== "string"
+      )
+        return;
+      try {
+        const url = new URL(event.data.url, window.location.origin);
+        const scope = new URL(appPath("/"), window.location.origin);
+        if (
+          url.origin !== scope.origin ||
+          url.pathname.replace(/\/$/, "") !== scope.pathname.replace(/\/$/, "")
+        )
+          return;
+        const target = url.searchParams.get("view") || "messages";
+        if (!titles[target]) return;
+        history.replaceState(null, "", url);
+        setView(target);
+        setOpenedMessage(url.searchParams.get("message"));
+        void refresh().catch((e) => setError(e.message));
+      } catch {
+        /* Ignore invalid cross-app notification targets. */
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", notificationNavigate);
     window.addEventListener("hashchange", authLinkChange);
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("pageshow", pageShow);
     window.addEventListener("storage", sessionChange);
     return () => {
+      navigator.serviceWorker?.removeEventListener(
+        "message",
+        notificationNavigate,
+      );
       window.removeEventListener("hashchange", authLinkChange);
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("pageshow", pageShow);
@@ -355,7 +394,7 @@ export default function Page() {
     ),
     week = summarize(weekActivities),
     unread = state.messages.filter(
-      (m) => m.status === "sent" && !m.readAt,
+      (m) => m.status === "sent" && !m.readAt && !m.archivedAt,
     ).length,
     isAdmin = state.me.role === "admin" && !participantView;
   const currentRules = state.rules.filter(
@@ -408,6 +447,27 @@ export default function Page() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <button
+            className={`side-setting ${activeView === "challenges" ? "active" : ""}`}
+            onClick={() => navigate("challenges")}
+          >
+            <Diamond size={18} />
+            Výzvy a odmeny
+          </button>
+          <button
+            className={`side-setting ${activeView === "me" ? "active" : ""}`}
+            onClick={() => navigate("me")}
+          >
+            <UserRound size={18} />
+            Profil a nastavenia
+          </button>
+          <button
+            className={`side-setting ${activeView === "help" ? "active" : ""}`}
+            onClick={() => navigate("help")}
+          >
+            <HelpCircle size={18} />
+            Ako na to
+          </button>
           {state.me.role === "admin" && (
             <>
               {!participantView && (
@@ -422,22 +482,10 @@ export default function Page() {
                   Administrácia
                 </button>
               )}
-              <button
-                className="side-setting"
-                onClick={() => {
-                  setParticipantView(!participantView);
-                  navigate("home");
-                }}
-              >
-                <ShieldCheck size={18} />
-                {participantView
-                  ? "Späť do roly organizátora"
-                  : "Účastnícke zobrazenie"}
-              </button>
             </>
           )}
           <div className="sidebar-person">
-            <Avatar name={state.me.nickname} />
+            <Avatar imageUrl={state.me.avatarUrl} name={state.me.nickname} />
             <div>
               <strong>{state.me.nickname}</strong>
               <span>
@@ -469,13 +517,71 @@ export default function Page() {
             <ChevronRight size={14} />
             <strong>
               {navigation.find((n) => n.id === activeView)?.name ||
-                (activeView === "admin" ? "Administrácia" : "Oznámenia")}
+                {
+                  admin: "Administrácia",
+                  messages: "Správy",
+                  challenges: "Výzvy a odmeny",
+                  me: "Profil",
+                  help: "Ako na to",
+                }[activeView] ||
+                "Domov"}
             </strong>
           </div>
           <div className="topbar-actions">
-            {state.course.testMode && (
-              <span className="test-label">TESTOVACÍ ROČNÍK</span>
+            <span className="season-label">
+              {state.course.year || state.course.endDate.slice(0, 4)}
+            </span>
+            {state.me.role === "admin" && (
+              <label className="role-switch">
+                <ShieldCheck size={16} />
+                <span className="sr-only">Režim zobrazenia</span>
+                <select
+                  aria-label="Režim zobrazenia"
+                  value={participantView ? "participant" : "admin"}
+                  onChange={(e) => {
+                    setParticipantView(e.target.value === "participant");
+                    if (activeView === "admin") navigate("home");
+                  }}
+                >
+                  <option value="admin">Organizátor</option>
+                  <option value="participant">Účastník</option>
+                </select>
+              </label>
             )}
+            <details className="top-menu">
+              <summary aria-label="Ďalšie možnosti">
+                <Menu size={21} />
+              </summary>
+              <div>
+                {[
+                  { id: "challenges", label: "Výzvy a odmeny", icon: Diamond },
+                  { id: "me", label: "Profil a nastavenia", icon: UserRound },
+                  { id: "help", label: "Ako na to", icon: HelpCircle },
+                  ...(isAdmin
+                    ? [
+                        {
+                          id: "admin",
+                          label: `Administrácia${state.pendingAccounts ? ` (${state.pendingAccounts})` : ""}`,
+                          icon: Settings,
+                        },
+                      ]
+                    : []),
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={(e) => {
+                      e.currentTarget
+                        .closest("details")
+                        ?.removeAttribute("open");
+                      navigate(item.id);
+                    }}
+                  >
+                    <item.icon size={18} />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </details>
             <button
               className={`notification-button ${activeView === "messages" ? "active" : ""}`}
               aria-label={`Oznámenia, ${unread} neprečítaných`}
@@ -489,7 +595,11 @@ export default function Page() {
               aria-label="Môj profil"
               onClick={() => navigate("me")}
             >
-              <Avatar name={state.me.nickname} size="small" />
+              <Avatar
+                imageUrl={state.me.avatarUrl}
+                name={state.me.nickname}
+                size="small"
+              />
             </button>
           </div>
         </header>
@@ -504,40 +614,17 @@ export default function Page() {
               <h1>{titles[activeView]}</h1>
               {activeView === "home" && (
                 <p>
-                  Niekoľko týždňov prípravy. Každý svojím tempom, spolu na
-                  jednej ceste.
+                  Príprava {fmt(state.course.startDate)} –{" "}
+                  {fmt(state.course.endDate, {
+                    day: "numeric",
+                    month: "numeric",
+                    year: "numeric",
+                  })}
                 </p>
               )}
             </div>
-            <button
-              className="button primary add-activity"
-              onClick={() => setForm("new")}
-            >
-              <Plus size={20} />
-              Pridať aktivitu
-            </button>
           </div>
-          {state.me.role === "admin" && (
-            <div className="role-preview-bar">
-              <span>
-                {participantView
-                  ? "Účastnícke zobrazenie · moderátorské ovládanie je skryté."
-                  : "Organizátorské zobrazenie"}
-              </span>
-              <button
-                className="button secondary"
-                onClick={() => {
-                  setParticipantView(!participantView);
-                  navigate("home");
-                }}
-              >
-                <ShieldCheck size={16} />
-                {participantView
-                  ? "Späť do organizácie"
-                  : "Zobraziť ako účastník"}
-              </button>
-            </div>
-          )}
+
           {notice && (
             <div className="notice" role="status">
               <span>{notice}</span>
@@ -552,204 +639,19 @@ export default function Page() {
             </p>
           )}
           {activeView === "home" && (
-            <>
-              <div className="overview-layout">
-                <div className="overview-main">
-                  <section className="week-card">
-                    <div className="section-head">
-                      <div>
-                        <p className="eyebrow">TVOJ TÝŽDEŇ V SKRATKE</p>
-                        <h2>
-                          {fmt(monday(state.today))} –{" "}
-                          {fmt(add(monday(state.today), 6))}
-                        </h2>
-                      </div>
-                      <CalendarDays size={23} />
-                    </div>
-                    <div className="week-stats">
-                      <div>
-                        <span className="stat-icon">
-                          <Footprints size={19} />
-                        </span>
-                        <strong>{week.movementDays}</strong>
-                        <span>pohybové dni</span>
-                      </div>
-                      <div>
-                        <span className="stat-icon">
-                          <Clock size={19} />
-                        </span>
-                        <strong>
-                          {week.minutes === null ? "—" : week.minutes}
-                        </strong>
-                        <span>zapísané minúty</span>
-                      </div>
-                      <div>
-                        <span className="stat-icon">
-                          <Diamond size={19} />
-                        </span>
-                        <strong>
-                          {
-                            ownAwards.filter(
-                              (a) => a.periodStart >= monday(state.today),
-                            ).length
-                          }
-                        </strong>
-                        <span>nové odmeny</span>
-                      </div>
-                    </div>
-                    <div className="week-days">
-                      {Array.from({ length: 7 }, (_, i) =>
-                        add(monday(state.today), i),
-                      ).map((d, i) => {
-                        const n = own.filter((a) => a.date === d).length;
-                        return (
-                          <button
-                            key={d}
-                            className={`${n ? "recorded" : ""} ${d === state.today ? "today" : ""}`}
-                            disabled={d > state.today}
-                            onClick={() => setSelectedDay(d)}
-                            aria-label={`${fmt(d)}: ${n ? n + " zápisov" : "bez zápisu"}`}
-                          >
-                            <span>
-                              {["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}
-                            </span>
-                            <i>
-                              {n ? <Check size={16} /> : Number(d.slice(-2))}
-                            </i>
-                            {n > 1 && <sup>{n}</sup>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="small muted">
-                      {week.missingMinutes
-                        ? `${week.missingMinutes} zápisov bez uvedeného trvania. `
-                        : ""}
-                      Počítame zapísaný pohyb, nie tvoju pripravenosť na kurz.
-                    </p>
-                  </section>
-                  {pinned && (
-                    <button
-                      className="pinned-message"
-                      onClick={() => {
-                        setOpenedMessage(pinned.id);
-                        navigate("messages");
-                      }}
-                    >
-                      <span className="pinned-icon">
-                        <Bell size={21} />
-                      </span>
-                      <span>
-                        <small>DÔLEŽITÉ OD ORGANIZÁTOROV</small>
-                        <strong>{pinned.title}</strong>
-                        <span>
-                          {pinned.body.slice(0, 120)}
-                          {pinned.body.length > 120 ? "…" : ""}
-                        </span>
-                      </span>
-                      <ChevronRight size={19} />
-                    </button>
-                  )}
-                  <Feed
-                    state={state}
-                    activities={state.activities}
-                    onEdit={(a) => setForm(a)}
-                    onAction={action}
-                    allowModeration={!participantView}
-                    compact
-                    limit={5}
-                  />
-                </div>
-                <aside className="overview-aside">
-                  <section className="panel collection-preview">
-                    <div className="section-head">
-                      <h2>Tvoje drahokamy</h2>
-                      <button
-                        className="icon-button"
-                        aria-label="Pozrieť odmeny"
-                        onClick={() => navigate("challenges")}
-                      >
-                        <ArrowUpRight size={19} />
-                      </button>
-                    </div>
-                    <div className="gem-line">
-                      {currentRules.map((r, i) => (
-                        <button
-                          key={r.rule.id}
-                          title={`${r.rule.name}: ${r.progress.complete ? "získané" : r.progress.missing}`}
-                          onClick={() => navigate("challenges")}
-                        >
-                          <Gem index={i} earned={r.progress.complete} />
-                          <span>{r.rule.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="small muted">
-                      Každý za niečo iné. Žiadne poradie, žiadne preteky.
-                    </p>
-                    <button
-                      className="text-button teal"
-                      onClick={() => navigate("challenges")}
-                    >
-                      Ako ich získať <ArrowRight size={15} />
-                    </button>
-                  </section>
-                  {currentRules.find((r) => !r.progress.complete) && (
-                    <RuleCard
-                      item={currentRules.find((r) => !r.progress.complete)!}
-                      index={0}
-                      state={state}
-                      onAction={action}
-                      small
-                    />
-                  )}
-                  <section className="panel challenge-preview">
-                    <span className="eyebrow">OD ORGANIZÁTOROV</span>
-                    <h2>
-                      {currentChallenges.length
-                        ? "Výzva na obzore"
-                        : "Priestor na nové výzvy"}
-                    </h2>
-                    {currentChallenges.length ? (
-                      <>
-                        <span className="pill soft">
-                          {currentChallenges[0].startDate > state.today
-                            ? "Už zverejnená · začne čoskoro"
-                            : "Aktuálna výzva"}
-                        </span>
-                        <h3>{currentChallenges[0].name}</h3>
-                        <p>{currentChallenges[0].description.slice(0, 145)}</p>
-                        <span className="small muted">
-                          Do {fmt(currentChallenges[0].endDate)} vrátane
-                        </span>
-                      </>
-                    ) : (
-                      <p>
-                        Keď organizátori zverejnia výzvu, nájdeš ju tu. Zatiaľ
-                        si môžeš zapisovať svoj pohyb.
-                      </p>
-                    )}
-                    <button
-                      className="text-button teal"
-                      onClick={() => navigate("challenges")}
-                    >
-                      Pozrieť výzvy <ArrowRight size={15} />
-                    </button>
-                  </section>
-                  <div className="quiet-reminder">
-                    <img
-                      src={appPath("/brand/hory_title_complete.png")}
-                      alt=""
-                    />
-                    <p>
-                      Do hôr pôjdeme spolu.
-                      <br />
-                      Príprava je tvoja vlastná cesta.
-                    </p>
-                  </div>
-                </aside>
-              </div>
-            </>
+            <HomeDashboard
+              state={state}
+              onAction={action}
+              onAdd={() => setForm("new")}
+              onEdit={setForm}
+              onDay={setSelectedDay}
+              onNavigate={navigate}
+              onMessage={(id) => {
+                setOpenedMessage(id);
+                navigate("messages");
+              }}
+              allowModeration={!participantView}
+            />
           )}
           {activeView === "group" && (
             <Group
@@ -764,39 +666,16 @@ export default function Page() {
           )}
           {activeView === "me" && (
             <>
-              <Profile state={state} action={action} onLogout={logout} />
-              <PasswordSettings account={accountInfo} onChanged={refresh} />
-              <Stats
-                startDate={state.course.startDate}
-                activities={own}
-                today={state.today}
-                onDay={setSelectedDay}
-              />
-              <section className="panel">
-                <div className="section-head">
-                  <div>
-                    <p className="eyebrow">ODMENY ZA TVOJE ZÁPISY</p>
-                    <h2>
-                      Získané drahokamy{" "}
-                      <span className="count-text">{ownAwards.length}</span>
-                    </h2>
-                  </div>
-                </div>
-                <AwardHistory
-                  awards={ownAwards}
-                  activities={own}
-                  progress={state.rules}
-                />
-              </section>
-              <Feed
+              <Profile
                 state={state}
-                activities={own}
-                onEdit={(a) => setForm(a)}
-                onAction={action}
-                allowModeration={!participantView}
+                action={action}
+                onLogout={logout}
+                onRefresh={refresh}
               />
+              <PasswordSettings account={accountInfo} onChanged={refresh} />
             </>
           )}
+          {activeView === "help" && <Help />}
           {activeView === "messages" && (
             <Messages
               state={state}
@@ -814,7 +693,9 @@ export default function Page() {
           )}
           <footer className="page-footer">
             <span>Cestou Zimy · každý svojím tempom</span>
-            <span>{state.course.timezone} · týždeň pondelok – nedeľa</span>
+            <button className="text-button" onClick={() => navigate("help")}>
+              Ako na to <HelpCircle size={14} />
+            </button>
           </footer>
         </main>
       </div>
@@ -830,19 +711,12 @@ export default function Page() {
             <span>{n.name}</span>
           </button>
         ))}
-        {isAdmin && (
-          <button
-            className={activeView === "admin" ? "active" : ""}
-            onClick={() => {
-              setParticipantView(false);
-              navigate("admin");
-            }}
-          >
-            <Settings size={22} />
-            <span>Správa</span>
-          </button>
-        )}
       </nav>
+      <AwardCelebration
+        state={state}
+        blocked={!!form || !!selectedDay || activeView === "admin"}
+        onOpen={() => navigate("challenges")}
+      />
       <Squirrel
         state={state}
         blocked={!!form || !!selectedDay || activeView === "admin"}
@@ -861,6 +735,14 @@ export default function Page() {
           title={`Tvoj deň · ${fmt(selectedDay, { day: "numeric", month: "long" })}`}
           onClose={() => setSelectedDay(null)}
         >
+          {state.cold?.calendar.some(
+            (c) => c.memberId === state.me.id && c.date === selectedDay,
+          ) && (
+            <p className="cold-day-note">
+              <Snowflake size={18} />V tento deň si pridala/pridal aj vločku za
+              otužovanie.
+            </p>
+          )}
           <Feed
             state={state}
             activities={own.filter((a) => a.date === selectedDay)}
@@ -881,10 +763,12 @@ function Profile({
   state,
   action,
   onLogout,
+  onRefresh,
 }: {
   state: AppState;
   action: (a: string, d?: Record<string, unknown>) => Promise<any>;
   onLogout: () => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [name, setName] = useState(state.me.nickname),
     [animations, setAnimations] = useState(state.me.animations),
@@ -894,7 +778,11 @@ function Profile({
     <div className="profile-grid">
       <section className="panel">
         <div className="profile-title">
-          <Avatar name={state.me.nickname} size="large" />
+          <Avatar
+            imageUrl={state.me.avatarUrl}
+            name={state.me.nickname}
+            size="large"
+          />
           <div>
             <p className="eyebrow">TVOJ PROFIL</p>
             <h2>{state.me.nickname}</h2>
@@ -903,6 +791,7 @@ function Profile({
             </p>
           </div>
         </div>
+        <AvatarEditor avatarUrl={state.me.avatarUrl} onChanged={onRefresh} />
         <form
           className="stack"
           onSubmit={async (e) => {
@@ -937,7 +826,7 @@ function Profile({
               onChange={(e) => setAnimations(e.target.checked)}
             />
             <span>
-              Povoliť občasné vykuknutie veveričky
+              Povoliť medvedíka a oslavy odmien
               <small>Správy a odmeny ostávajú dostupné aj bez animácií.</small>
             </span>
           </label>
@@ -988,11 +877,17 @@ function Messages({
   setOpened: (s: string | null) => void;
 }) {
   const [error, setError] = useState("");
-  const messages = state.messages
+  const [archive, setArchive] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const all = state.messages
     .filter((m) => m.status === "sent")
     .sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+  const messages = all.filter((m) =>
+    archive ? !!m.archivedAt : !m.archivedAt,
+  );
   useEffect(() => {
-    const msg = messages.find((m) => m.id === opened);
+    const msg = all.find((m) => m.id === opened);
+    if (msg?.archivedAt) setArchive(true);
     if (msg && !msg.readAt)
       void action("readMessage", { id: msg.id }).catch((e) =>
         setError(e.message),
@@ -1000,15 +895,53 @@ function Messages({
   }, [opened]);
   return (
     <section className="messages-list">
+      <div
+        className="segmented message-folders"
+        role="group"
+        aria-label="Priečinok správ"
+      >
+        <button
+          aria-pressed={!archive}
+          onClick={() => {
+            setArchive(false);
+            setOpened(null);
+          }}
+        >
+          Správy
+        </button>
+        <button
+          aria-pressed={archive}
+          onClick={() => {
+            setArchive(true);
+            setOpened(null);
+          }}
+        >
+          <Archive size={16} />
+          Archív · {all.filter((m) => m.archivedAt).length}
+        </button>
+      </div>
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
+      {opened && !all.some((m) => m.id === opened) && (
+        <p className="info-note">
+          Táto správa už nie je dostupná alebo nie je určená tvojmu účtu.
+          Ostatné správy nájdeš nižšie.
+        </p>
+      )}
       {!messages.length ? (
-        <Empty title="Zatiaľ žiadne správy">
-          Oznámenia od organizátorov ostávajú tu, aj keď si nezapneš
-          upozornenia.
+        <Empty
+          title={
+            archive
+              ? "Archív je zatiaľ prázdny"
+              : "Všetko prečítané? Tu budú nové správy."
+          }
+        >
+          {archive
+            ? "Sem sa presunú správy, ktoré vezmeš na vedomie."
+            : "Oznámenia organizátorov ostávajú dostupné aj bez zapnutých upozornení."}
         </Empty>
       ) : (
         messages.map((m) => (
@@ -1025,13 +958,13 @@ function Messages({
                 <Bell size={20} />
               </span>
               <span>
-                <div className="message-meta">
+                <span className="message-meta">
                   {m.important && <span className="pill soft">Dôležité</span>}
                   {!m.readAt && (
                     <span className="unread-label">Neprečítané</span>
                   )}
                   <time>{fmt(m.sentAt || m.createdAt)}</time>
-                </div>
+                </span>
                 <h2>{m.title}</h2>
                 {opened !== m.id && (
                   <p>
@@ -1050,8 +983,38 @@ function Messages({
                     Otvoriť odkaz <ArrowRight size={16} />
                   </a>
                 )}
+                <button
+                  className="button secondary"
+                  disabled={busy === m.id}
+                  onClick={async () => {
+                    setBusy(m.id);
+                    setError("");
+                    try {
+                      await action("archiveMessage", {
+                        id: m.id,
+                        archived: !m.archivedAt,
+                      });
+                      setOpened(null);
+                    } catch (e) {
+                      setError(
+                        e instanceof Error
+                          ? e.message
+                          : "Správu sa nepodarilo presunúť.",
+                      );
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  <Archive size={16} />
+                  {busy === m.id
+                    ? "Ukladám…"
+                    : m.archivedAt
+                      ? "Vrátiť medzi správy"
+                      : "Beriem na vedomie · archivovať"}
+                </button>
                 <span className="small muted">
-                  Prečítané len v tvojom účte.
+                  Táto zmena sa týka iba tvojho účtu.
                 </span>
               </div>
             )}

@@ -1,10 +1,22 @@
 "use client";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Snowflake } from "lucide-react";
 import type { AppState, Activity, Member } from "../lib/types";
-import { Avatar, fmt, add, monday, Gem, Modal, Empty, type Action } from "./ui";
+import {
+  calendarBounds,
+  calendarDays,
+  type CalendarRange,
+} from "../lib/calendar";
+import { Avatar, fmt, Modal, type Action } from "./ui";
+import { usePreference } from "./preferences";
+import ActivityCalendar, {
+  ActivityDay,
+  CalendarControls,
+} from "./ActivityCalendar";
+import AwardArt from "./AwardArt";
 import Feed from "./Feed";
 import Stats from "./Stats";
+
 export default function Group({
   state,
   onEdit,
@@ -16,173 +28,220 @@ export default function Group({
   onAction: Action;
   allowModeration?: boolean;
 }) {
-  const [week, setWeek] = useState(monday(state.today));
+  const key = `${state.course.id}-${state.me.id}`;
+  const [tab, setTab] = usePreference<"activities" | "overview">(
+    `cz-group-tab-${key}`,
+    "activities",
+    ["activities", "overview"],
+  );
+  const [range, setRange] = usePreference<CalendarRange>(
+    `cz-group-range-${key}`,
+    "week",
+    ["week", "month"],
+  );
+  const [anchor, setAnchor] = useState(state.today);
   const [detail, setDetail] = useState<{
     member: Member;
     date?: string;
   } | null>(null);
-  const days = Array.from({ length: 7 }, (_, i) => add(week, i));
-  const members = state.members
+  const days = calendarDays("week", anchor).days;
+  const { start, end } = calendarBounds(range, anchor);
+  const members = [...state.members]
     .filter((m) => m.active)
     .sort((a, b) => a.nickname.localeCompare(b.nickname, "sk"));
+  function name(member: Member) {
+    return (
+      <button className="person-heading" onClick={() => setDetail({ member })}>
+        <Avatar name={member.nickname} imageUrl={member.avatarUrl} />
+        <span>
+          <strong>
+            {member.nickname}
+            {member.id === state.me.id && <small> · ty</small>}
+          </strong>
+          <small>Pozrieť prípravu</small>
+        </span>
+        <ArrowUpRight size={16} />
+      </button>
+    );
+  }
   return (
     <>
-      <section className="panel group-panel">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">KAŽDÝ SVOJÍM TEMPOM</p>
-            <h2>
-              Naša skupina{" "}
-              <span className="count-text">{members.length} ľudí</span>
-            </h2>
-          </div>
-          <div className="week-switch">
-            <button
-              className="icon-button"
-              aria-label="Predchádzajúci týždeň"
-              disabled={add(week, 6) < state.course.startDate}
-              onClick={() => setWeek(add(week, -7))}
-            >
-              <ChevronLeft size={19} />
-            </button>
-            <strong>
-              {fmt(week)} – {fmt(add(week, 6))}
-            </strong>
-            <button
-              className="icon-button"
-              aria-label="Nasledujúci týždeň"
-              disabled={week >= monday(state.today)}
-              onClick={() => setWeek(add(week, 7))}
-            >
-              <ChevronRight size={19} />
-            </button>
-          </div>
+      <div className="group-navigation">
+        <div
+          className="segmented large"
+          role="group"
+          aria-label="Zobrazenie skupiny"
+        >
+          <button
+            aria-pressed={tab === "activities"}
+            onClick={() => setTab("activities")}
+          >
+            Aktivity
+          </button>
+          <button
+            aria-pressed={tab === "overview"}
+            onClick={() => setTab("overview")}
+          >
+            Prehľad
+          </button>
         </div>
-        <p className="muted small">
-          Zoradené podľa mena, nie podľa výkonu. Klikni na deň a otvor konkrétne
-          zápisy.
-        </p>
-        <div className="group-matrix">
-          <div className="matrix-head">
-            <span>Účastník</span>
-            {days.map((d, i) => (
-              <span key={d}>
-                {["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}
-                <small>{fmt(d)}</small>
-              </span>
-            ))}
-            <span>Prehľad</span>
-          </div>
-          {members.map((m) => {
-            const acts = state.activities.filter((a) => a.memberId === m.id),
-              inWeek = acts.filter(
-                (a) => a.date >= week && a.date <= add(week, 6),
-              ),
-              count = new Set(
-                inWeek.filter((a) => a.group !== "task").map((a) => a.date),
-              ).size,
-              awards = state.awards.filter((a) => a.memberId === m.id);
-            return (
-              <div className="matrix-row" key={m.id}>
-                <button
-                  className="member-name"
-                  onClick={() => setDetail({ member: m })}
-                >
-                  <Avatar name={m.nickname} />
-                  <span>
-                    <strong>
-                      {m.nickname}
-                      {m.id === state.me.id && <small> ty</small>}
-                    </strong>
-                    <small>
-                      {acts.length
-                        ? "Posledný zápis " +
-                          fmt(
-                            acts
-                              .map((a) => a.date)
-                              .sort()
-                              .at(-1)!,
-                          )
-                        : "Zatiaľ bez zápisu"}
-                    </small>
-                  </span>
-                </button>
-                <div className="mobile-day-labels">
+        <span className="small muted">
+          {members.length} ľudí na spoločnej ceste
+        </span>
+      </div>
+      {tab === "activities" ? (
+        <Feed
+          state={state}
+          activities={state.activities}
+          onEdit={onEdit}
+          onAction={onAction}
+          allowModeration={allowModeration}
+        />
+      ) : (
+        <>
+          <section className="panel group-calendar-panel">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">KAŽDÝ SVOJÍM TEMPOM</p>
+                <h2>Naša skupina</h2>
+              </div>
+            </div>
+            <CalendarControls
+              range={range}
+              anchor={anchor}
+              today={state.today}
+              startDate={state.course.startDate}
+              onRange={setRange}
+              onAnchor={setAnchor}
+            />
+            <p className="small muted">
+              Ľudia sú zoradení podľa prezývky. Klepnutím na deň otvoríš
+              aktivity a komentáre.
+            </p>
+            {range === "week" ? (
+              <div className="people-week-grid">
+                <div className="people-week-head">
+                  <span>Účastník</span>
                   {days.map((d, i) => (
                     <span key={d}>
                       {["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}
+                      <small>{fmt(d)}</small>
                     </span>
                   ))}
                 </div>
-                {days.map((d) => {
-                  const n = inWeek.filter((a) => a.date === d).length;
+                {members.map((member) => (
+                  <div className="person-week" key={member.id}>
+                    {name(member)}
+                    <div className="person-week-days">
+                      {days.map((date) => (
+                        <ActivityDay
+                          key={date}
+                          date={date}
+                          today={state.today}
+                          memberName={member.nickname}
+                          activities={state.activities.filter(
+                            (a) => a.memberId === member.id && a.date === date,
+                          )}
+                          cold={state.cold?.calendar.some(
+                            (c) => c.memberId === member.id && c.date === date,
+                          )}
+                          disabled={date > state.today}
+                          onClick={() => setDetail({ member, date })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="people-month-grid">
+                {members.map((member) => {
+                  const activities = state.activities.filter(
+                    (a) => a.memberId === member.id,
+                  );
+                  const count = new Set(
+                    activities
+                      .filter(
+                        (a) =>
+                          a.group !== "task" &&
+                          a.date >= start &&
+                          a.date <= end,
+                      )
+                      .map((a) => a.date),
+                  ).size;
                   return (
-                    <button
-                      className={`day-cell ${n ? "has-activity" : ""} ${d === state.today ? "today" : ""}`}
-                      key={d}
-                      aria-label={`${m.nickname}, ${fmt(d)}: ${n ? n + " zápisov" : "bez zápisu"}`}
-                      title={`${fmt(d)}: ${n ? n + " zápisov" : "bez zápisu"}`}
-                      onClick={() => setDetail({ member: m, date: d })}
-                    >
-                      {n || "·"}
-                    </button>
+                    <section className="person-month" key={member.id}>
+                      {name(member)}
+                      <ActivityCalendar
+                        activities={activities}
+                        range="month"
+                        anchor={anchor}
+                        today={state.today}
+                        cold={state.cold?.calendar}
+                        memberId={member.id}
+                        onDay={(date) => setDetail({ member, date })}
+                      />
+                      <p className="small muted">
+                        Pohybové dni v mesiaci: {count}
+                      </p>
+                    </section>
                   );
                 })}
-                <div className="member-summary">
-                  <strong>
-                    {count}
-                    <span> pohybové dni</span>
-                  </strong>
-                  <small>◇ {awards.length} odmien</small>
-                </div>
               </div>
-            );
-          })}
-        </div>
-        <p className="small muted matrix-legend">
-          Bodka = bez zápisu · číslo = počet aktivít v daný deň. Pohybový deň sa
-          počíta raz, bez ohľadu na počet tréningov.
-        </p>
-      </section>
-      <Stats
-        startDate={state.course.startDate}
-        activities={state.activities}
-        today={state.today}
-        group
-      />
-      <Feed
-        state={state}
-        activities={state.activities}
-        onEdit={onEdit}
-        onAction={onAction}
-        allowModeration={allowModeration}
-      />
+            )}
+          </section>
+          <details className="panel group-details">
+            <summary>Spoločné štatistiky prípravy</summary>
+            <Stats
+              startDate={state.course.startDate}
+              activities={state.activities}
+              today={state.today}
+              group
+              preferenceKey={`group-stats-${key}`}
+            />
+          </details>
+        </>
+      )}
       {detail && (
         <Modal
           title={`${detail.member.nickname}${detail.date ? " · " + fmt(detail.date) : ""}`}
           onClose={() => setDetail(null)}
           wide
         >
+          {detail.date &&
+            state.cold?.calendar.some(
+              (c) => c.memberId === detail.member.id && c.date === detail.date,
+            ) && (
+              <p className="cold-day-note">
+                <Snowflake size={18} />V tento deň pribudla aj vločka za
+                otužovanie.
+              </p>
+            )}
           {!detail.date && (
-            <Stats
-              startDate={state.course.startDate}
-              activities={state.activities.filter(
-                (a) => a.memberId === detail.member.id,
-              )}
-              today={state.today}
-              onDay={(date) => setDetail({ ...detail, date })}
-            />
-          )}
-          {!detail.date && (
-            <section className="panel member-awards">
-              <h3>Získané drahokamy</h3>
-              {state.awards.some((a) => a.memberId === detail.member.id) ? (
+            <>
+              <Stats
+                startDate={state.course.startDate}
+                activities={state.activities.filter(
+                  (a) => a.memberId === detail.member.id,
+                )}
+                today={state.today}
+                cold={state.cold?.calendar}
+                memberId={detail.member.id}
+                preferenceKey={`member-${key}-${detail.member.id}`}
+                onDay={(date) => setDetail({ ...detail, date })}
+              />
+              <section className="panel member-awards">
+                <h3>Získané odmeny</h3>
                 <div className="award-history">
                   {state.awards
                     .filter((a) => a.memberId === detail.member.id)
-                    .map((award, index) => (
+                    .map((award) => (
                       <div key={award.id}>
-                        <Gem earned index={index} />
+                        <AwardArt
+                          earned
+                          visual={award.visual || award.snapshot.visual}
+                          rewardKey={award.ruleKey}
+                        />
                         <span>
                           <strong>{award.name}</strong>
                           <small>
@@ -194,11 +253,33 @@ export default function Group({
                         </span>
                       </div>
                     ))}
+                  {(state.personalAwards || [])
+                    .filter((a) => a.memberId === detail.member.id)
+                    .map((award) => (
+                      <div key={award.id}>
+                        <AwardArt
+                          earned
+                          visual={award.snapshot.visual}
+                          rewardKey={award.definitionId}
+                        />
+                        <span>
+                          <strong>{award.snapshot.name}</strong>
+                          <small>{fmt(award.date)}</small>
+                          <p className="small muted">
+                            {award.reason || award.snapshot.description}
+                          </p>
+                        </span>
+                      </div>
+                    ))}
+                  {!state.awards.some((a) => a.memberId === detail.member.id) &&
+                    !(state.personalAwards || []).some(
+                      (a) => a.memberId === detail.member.id,
+                    ) && (
+                      <p className="small muted">Zatiaľ bez získanej odmeny.</p>
+                    )}
                 </div>
-              ) : (
-                <p className="small muted">Zatiaľ bez získanej odmeny.</p>
-              )}
-            </section>
+              </section>
+            </>
           )}
           <Feed
             state={state}
@@ -207,7 +288,10 @@ export default function Group({
                 a.memberId === detail.member.id &&
                 (!detail.date || a.date === detail.date),
             )}
-            onEdit={onEdit}
+            onEdit={(activity) => {
+              setDetail(null);
+              onEdit(activity);
+            }}
             onAction={onAction}
             allowModeration={allowModeration}
             compact

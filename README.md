@@ -54,17 +54,27 @@ Preferovaná budúca adresa je **https://priprava.zimnykurz.sk**. Nastaví sa DN
 
 Databázový volume, účty a heslá zostanú; používatelia sa na novej doméne znovu prihlásia a zapnú push. Alternatíva **https://zimnykurz.sk/priprava** je naďalej pripravená, ale potrebuje verejnú serverovú reverse proxy. GitHub Pages z pôvodného webového repozitára ju neposkytne samotnou zmenou statických súborov. Podrobný postup pre obe možnosti je v dokumentácii; žiadne DNS ani existujúca produkcia sa automaticky nemenia.
 
+## Príprava a ďalšie ročníky
+
+Hlavné obrazovky sú **Domov** (vlastný denník, kalendár, denné motto a zápis) a **Všetci** (spoločné aktivity alebo týždenný/mesačný prehľad). Výzvy, odmeny, profil a pomoc sú dostupné v ponuke. Fotografie a avatary sa bezpečne ukladajú mimo klienta. Otužovanie má samostatné vločky a nepridáva pohybové minúty.
+
+Organizátor môže upravovať vizuály odmien, zverejniť dobrovoľné praktické úlohy alebo udeliť vlastné ocenenie. Administrátorské štatistiky obsahujú presne definované maximá, remízy a nominácie s návrhom rozdelenia medzi viacerých ľudí. Denné citáty majú autora, zdroj, originál a označenie slovenského prekladu.
+
+**Aktualizácia existujúcu prípravu neresetuje.** Migrácia zmení známe testovacie názvy na ročník 2027 a doplní hlavný kurz 3.–7. 2. 2027, ale zachová existujúce obdobie prípravy a údaje. Administrátorské **Spustiť prípravu na zimný kurz** je samostatný potvrdený krok s konkrétnymi dátumami, presným náhľadom výmazu a povinnou zálohou. Ročník ani dátumy ďalších období nie sú pevne viazané na rok 2027.
+
+Pri prvom nasadení tejto verzie vytvor zálohovací host adresár `/srv/cestou-zimy-backups` pre uid/gid 1000 (postup v DEPLOYMENT.md). Automatika štandardne vytvorí jednu overenú zálohu DB aj médií denne; existujúci host cron sa nastaví ako externý plánovač.
+
 ## Kde upravovať správanie
 
 - Bežné pravidlá, názvy, termíny, typy, výzvy a správy: **Administrácia** v aplikácii.
 - Herné šablóny a prvé pravidlá: `lib/gamification.ts`; verzie a uložené odmeny: `lib/server.ts`.
 - Vzhľad a tokeny: `app/globals.css`; originálne podklady: `public/brand`.
-- Veverička: `components/Squirrel.tsx`; limit v nastavení kurzu, osobné vypnutie v **Ja**.
+- Medvedík: `components/Squirrel.tsx`; limit v nastavení kurzu, osobné vypnutie v **Profil a nastavenia**.
 - Prihlásenie: `server/auth.ts`, `server/accounts.ts`; prvý organizátor: `scripts/create-admin.ts`; členstvo: `lib/server.ts`.
 - Push: `lib/push.ts`, `lib/outbox.ts`, `public/sw.js` a [docs/PUSH.md](docs/PUSH.md).
 
 ## Dokumentácia
 
-[Produkt](docs/PRODUCT.md) · [Gamifikácia](docs/GAMIFICATION.md) · [Dizajn](docs/DESIGN.md) · [Prihlásenie](docs/AUTH.md) · [Nasadenie](docs/DEPLOYMENT.md) · [Testovanie](docs/TESTING.md)
+[Návod pre účastníkov](docs/NAVOD_PRE_UCASTNIKOV.md) · [Organizátor](docs/ADMINISTRATOR.md) · [Produkt](docs/PRODUCT.md) · [Gamifikácia](docs/GAMIFICATION.md) · [Dizajn](docs/DESIGN.md) · [Prihlásenie](docs/AUTH.md) · [Nasadenie](docs/DEPLOYMENT.md) · [Testovanie](docs/TESTING.md)
 
 Repozitár obsahuje bežné zdrojové súbory; aplikácia nie je závislá od náhľadu v ChatGPT ani od prihlásenia účastníkov cez ChatGPT. Licencie fontov sú priložené; pôvod a použitie kurzových ilustrácií je zdokumentované v `docs/DESIGN.md`.

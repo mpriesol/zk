@@ -11,6 +11,7 @@ import {
 import {
   authLinkToken,
   authRequest,
+  AuthRequestError,
   clearAuthLink,
   type AuthOptions,
 } from "./auth-api";
@@ -35,6 +36,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
     [otp, setOtp] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [errorCode, setErrorCode] = useState<string | undefined>(),
     [message, setMessage] = useState(""),
     [seconds, setSeconds] = useState(0),
     [forgotHelp, setForgotHelp] = useState(false),
@@ -43,6 +45,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   useEffect(() => {
     let cancelled = false;
     setError("");
+    setErrorCode(undefined);
     authRequest<AuthOptions>("/api/auth-options")
       .then((data) => {
         if (cancelled) return;
@@ -86,6 +89,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   function changeScreen(next: Screen) {
     setScreen(next);
     setError("");
+    setErrorCode(undefined);
     setMessage("");
     setPassword("");
     setOtp("");
@@ -116,6 +120,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
     if (!options || busy) return;
     setBusy(true);
     setError("");
+    setErrorCode(undefined);
     setMessage("");
     try {
       if (screen === "email") await sendCode();
@@ -161,6 +166,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
         await finishLogin();
       }
     } catch (e) {
+      setErrorCode(e instanceof AuthRequestError ? e.code : undefined);
       setError(
         e instanceof Error ? e.message : "Požiadavku sa nepodarilo dokončiť.",
       );
@@ -345,9 +351,20 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
             </label>
           )}
           {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
+            <div className="error" role="alert">
+              <p>{error}</p>
+              {screen === "register" &&
+                errorCode === "USERNAME_IS_ALREADY_TAKEN" && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() => changeScreen("login")}
+                  >
+                    Prihlásiť sa ako {username.trim()}
+                  </button>
+                )}
+            </div>
           )}
           {message && (
             <p className="info-note" role="status">

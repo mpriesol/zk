@@ -1,10 +1,279 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { createSnapshot } from "../scripts/backup.mjs";
+import {
+  dueBackupDay,
+  schedulerMode,
+  startBackupScheduler,
+} from "../server/backup-scheduler.ts";
+
+test("snapshot manifests include every referenced photo and offline restore recovers files and DB together", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zk-full-backup-")),
+    live = join(dir, "live"),
+    media = join(live, "media"),
+    backups = join(dir, "backups"),
+    file = join(live, "app.sqlite");
+  mkdirSync(media, { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec(
+    "PRAGMA journal_mode=WAL;CREATE TABLE courses(id TEXT PRIMARY KEY);INSERT INTO courses VALUES('old');CREATE TABLE media(id TEXT PRIMARY KEY,storage_name TEXT,bytes INTEGER);",
+  );
+  const first = randomUUID(),
+    second = randomUUID(),
+    image = Buffer.from("immutable-photo-first"),
+    newImage = Buffer.from("immutable-photo-second");
+  writeFileSync(join(media, first + ".webp"), image);
+  db.prepare("INSERT INTO media VALUES(?,?,?)").run(
+    first,
+    first + ".webp",
+    image.length,
+  );
+  try {
+    const snapshot = await createSnapshot({
+      databasePath: file,
+      mediaDirectory: media,
+      backupDirectory: backups,
+      reason: "manual",
+    });
+    const manifest = JSON.parse(readFileSync(snapshot.manifest, "utf8"));
+    assert.equal(manifest.media.length, 1);
+    assert.equal(manifest.media[0].storageName, first + ".webp");
+    assert.deepEqual(
+      readFileSync(join(snapshot.assets, first + ".webp")),
+      image,
+    );
+    db.exec("UPDATE courses SET id='new';DELETE FROM media");
+    db.prepare("INSERT INTO media VALUES(?,?,?)").run(
+      second,
+      second + ".webp",
+      newImage.length,
+    );
+    writeFileSync(join(media, second + ".webp"), newImage);
+    rmSync(join(media, first + ".webp"));
+    db.close();
+    const restored = spawnSync(
+      process.execPath,
+      [
+        new URL("../scripts/restore.mjs", import.meta.url).pathname,
+        snapshot.database,
+        "--confirm-stopped",
+      ],
+      {
+        env: { ...process.env, DATABASE_PATH: file, MEDIA_DIRECTORY: media },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(restored.status, 0, restored.stderr);
+    assert.deepEqual(readFileSync(join(media, first + ".webp")), image);
+    assert.equal(existsSync(join(media, second + ".webp")), false);
+    const check = new DatabaseSync(file);
+    assert.equal(check.prepare("SELECT id FROM courses").get()!.id, "old");
+    assert.equal(check.prepare("SELECT id FROM media").get()!.id, first);
+    check.close();
+    assert.ok(
+      readdirSync(live).some(
+        (name) =>
+          name.includes("before-restore") && name.endsWith(".manifest.json"),
+      ),
+    );
+  } finally {
+    try {
+      db.close();
+    } catch {}
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("missing media cannot finalize a snapshot or remove the last good backup; daily retention preserves manual snapshots", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zk-backup-retention-")),
+    file = join(dir, "app.sqlite"),
+    media = join(dir, "media"),
+    backups = join(dir, "backups");
+  mkdirSync(media);
+  const db = new DatabaseSync(file);
+  db.exec(
+    "CREATE TABLE courses(id TEXT);INSERT INTO courses VALUES('course');CREATE TABLE media(id TEXT PRIMARY KEY,storage_name TEXT,bytes INTEGER)",
+  );
+  try {
+    const manual = await createSnapshot({
+      databasePath: file,
+      mediaDirectory: media,
+      backupDirectory: backups,
+      reason: "before-preparation-start",
+    });
+    let last: any;
+    for (const day of ["2026-11-19", "2026-11-20", "2026-11-21"])
+      last = await createSnapshot({
+        databasePath: file,
+        mediaDirectory: media,
+        backupDirectory: backups,
+        reason: "daily",
+        scheduleDate: day,
+        courseId: "course",
+        now: new Date(day + "T02:15:00Z"),
+        retention: 2,
+      });
+    const duplicate = await createSnapshot({
+      databasePath: file,
+      mediaDirectory: media,
+      backupDirectory: backups,
+      reason: "daily",
+      scheduleDate: "2026-11-21",
+      courseId: "course",
+      retention: 2,
+    });
+    assert.equal(duplicate.skipped, true);
+    assert.equal(duplicate.backupId, last.backupId);
+    assert.equal(
+      readdirSync(backups).filter((name) => name.endsWith(".manifest.json"))
+        .length,
+      3,
+    );
+    assert.equal(existsSync(manual.manifest), true);
+    const id = randomUUID();
+    db.prepare("INSERT INTO media VALUES(?,?,?)").run(id, id + ".webp", 5);
+    await assert.rejects(
+      createSnapshot({
+        databasePath: file,
+        mediaDirectory: media,
+        backupDirectory: backups,
+        reason: "daily",
+        scheduleDate: "2026-11-22",
+        courseId: "course",
+        retention: 1,
+      }),
+      /chýba/,
+    );
+    assert.equal(existsSync(last.manifest), true);
+    assert.equal(
+      readdirSync(backups).filter((name) => name.endsWith(".manifest.json"))
+        .length,
+      3,
+    );
+    const status = JSON.parse(
+      readFileSync(join(backups, "last-status.json"), "utf8"),
+    );
+    assert.equal(status.lastSuccess.backupId, last.backupId);
+    assert.ok(status.lastError);
+    assert.equal(
+      readdirSync(backups).some((name) => name.startsWith(".incomplete-")),
+      false,
+    );
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("restore failure after offline checkpoint preserves all original committed WAL data", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zk-restore-failure-")),
+    live = join(dir, "live"),
+    backupDir = join(dir, "backups"),
+    target = join(live, "app.sqlite"),
+    source = join(dir, "source.sqlite");
+  mkdirSync(live);
+  const old = new DatabaseSync(source);
+  old.exec(
+    "CREATE TABLE courses(id TEXT PRIMARY KEY);INSERT INTO courses VALUES('backup')",
+  );
+  old.close();
+  try {
+    const snapshot = await createSnapshot({
+      databasePath: source,
+      backupDirectory: backupDir,
+    });
+    const crash = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        "import {DatabaseSync} from 'node:sqlite';const d=new DatabaseSync(process.env.DATABASE_PATH);d.exec(\"PRAGMA journal_mode=WAL;PRAGMA wal_autocheckpoint=0;CREATE TABLE courses(id TEXT PRIMARY KEY);INSERT INTO courses VALUES('committed-original')\");process.exit(0);",
+      ],
+      { env: { ...process.env, DATABASE_PATH: target }, encoding: "utf8" },
+    );
+    assert.equal(crash.status, 0, crash.stderr);
+    assert.ok(statSync(target + "-wal").size > 0);
+    // A deliberately conflicting isolated media root moves the staged DB away,
+    // causing the final DB rename to fail. No system paths or live data are used.
+    const failed = spawnSync(
+      process.execPath,
+      [
+        new URL("../scripts/restore.mjs", import.meta.url).pathname,
+        snapshot.database,
+        "--confirm-stopped",
+      ],
+      {
+        env: { ...process.env, DATABASE_PATH: target, MEDIA_DIRECTORY: live },
+        encoding: "utf8",
+      },
+    );
+    assert.notEqual(failed.status, 0);
+    const preserved = new DatabaseSync(target);
+    assert.equal(
+      preserved.prepare("SELECT id FROM courses").get()!.id,
+      "committed-original",
+    );
+    preserved.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("daily scheduler follows local time, handles repeated DST hours once and yields to external scheduling", async () => {
+  assert.equal(
+    dueBackupDay(new Date("2026-03-29T01:14:00Z"), "Europe/Bratislava"),
+    null,
+  );
+  assert.equal(
+    dueBackupDay(new Date("2026-03-29T01:15:00Z"), "Europe/Bratislava"),
+    "2026-03-29",
+  );
+  let current = new Date("2026-10-25T00:30:00Z");
+  const calls: string[] = [];
+  const scheduler = startBackupScheduler({
+    mode: "internal",
+    time: "02:30",
+    now: () => current,
+    getTimezone: () => "Europe/Bratislava",
+    runSnapshot: async (day) => {
+      calls.push(day);
+    },
+    log: () => {},
+  });
+  try {
+    await scheduler.tick();
+    current = new Date("2026-10-25T01:30:00Z");
+    await scheduler.tick();
+    assert.deepEqual(calls, ["2026-10-25"]);
+    current = new Date("2026-10-26T01:30:00Z");
+    await scheduler.tick();
+    assert.deepEqual(calls, ["2026-10-25", "2026-10-26"]);
+  } finally {
+    await scheduler.stop();
+  }
+  const directory = mkdtempSync(join(tmpdir(), "zk-external-backup-"));
+  try {
+    writeFileSync(join(directory, ".external-scheduler"), "host timer");
+    assert.equal(
+      schedulerMode({ BACKUP_SCHEDULER: "internal" }, directory),
+      "external",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("online WAL backup and explicit offline restore preserve recoverable previous state", () => {
   const dir = mkdtempSync(join(tmpdir(), "zk-backup-"));

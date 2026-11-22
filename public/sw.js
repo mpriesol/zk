@@ -59,7 +59,7 @@ self.addEventListener("push", (event) => {
             ? payload.tag.slice(0, 120)
             : "cestou-zimy-message",
         icon: APP_BASE_PATH + "/brand/icon-192.png",
-        badge: APP_BASE_PATH + "/brand/icon-192.png",
+        badge: APP_BASE_PATH + "/brand/notification-badge.png",
         data: { url: safePath(payload.url) },
         renotify: false,
       },
@@ -71,19 +71,40 @@ self.addEventListener("notificationclick", (event) => {
   const path = safePath(event.notification.data && event.notification.data.url);
   event.waitUntil(
     (async () => {
-      const windows = await self.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
+      let windows = [];
+      try {
+        windows = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+      } catch {
+        /* A fresh window is the fallback. */
+      }
       for (const client of windows) {
-        if (
-          new URL(client.url).origin === self.location.origin &&
-          isAppPath(new URL(client.url).pathname) &&
-          "focus" in client
-        ) {
-          await client.navigate(path);
-          await client.focus();
+        try {
+          const current = new URL(client.url);
+          if (
+            current.origin !== self.location.origin ||
+            !isAppPath(current.pathname) ||
+            !("focus" in client)
+          )
+            continue;
+          const navigated = await client.navigate(path);
+          if (navigated === null) continue;
+          const target = navigated || client;
+          await target.focus();
+          if (target.postMessage)
+            target.postMessage({ type: "notification-navigate", url: path });
           return;
+        } catch {
+          // A failed navigate/focus must not prevent openWindow. The live app
+          // also receives the target when it can recover without reloading.
+          try {
+            if (client.postMessage)
+              client.postMessage({ type: "notification-navigate", url: path });
+          } catch {
+            /* closed client */
+          }
         }
       }
       await self.clients.openWindow(path);

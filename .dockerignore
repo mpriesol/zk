@@ -10,6 +10,7 @@ dist
 .openai
 .sites-runtime
 .data
+.data-backups
 data
 backups
 *.sqlite

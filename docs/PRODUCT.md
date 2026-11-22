@@ -1,15 +1,17 @@
-# Produkt v1
+# Produkt — príprava od ročníka 2027
 
 Jeden aktuálny kurz s identifikátorom `COURSE_ID`, dospelí pozvaní účastníci a organizátori. Účet možno vytvoriť prezývkou a heslom bez e-mailu. Meno a priezvisko sú nepovinné a súkromné; ostatní účastníci vidia iba prezývku. Platný pozývací odkaz umožní vstup, inak nová registrácia čaká na schválenie organizátorom. SMTP/e-mailový kód ostáva voliteľný spôsob prihlásenia. Každé API kontroluje aktívne členstvo; session odobratého člena nezabezpečí prístup. Ostatní členovia vidia prezývku, nie e-mail. Súhrny sú záznamy dobrovoľnej aktivity, nikdy zdravotné skóre alebo dôkaz neaktivity.
 
 ## Obrazovky
 
-- **Domov**: rýchly zápis, vlastný týždenný súhrn, odmeny, výzvy, pripnutá správa, feed.
-- **Všetci**: abecedná skupina, týždenná matica na desktope a kompaktné dni na mobile; detail dňa/človeka, spoločné grafy.
-- **Výzvy**: podmienky, progres a započítané záznamy; základné drahokamy a samostatné zverejnené ad-hoc výzvy. Manuálne úlohy nepotrebujú schvaľovanie inštruktorom.
-- **Ja**: prezývka, osobné grafy, história a kalendár, zbierka, vypnutie animácií a dobrovoľný push.
-- **Správy**: vlastná história, neprečítané a individuálny stav prečítania.
-- **Administrácia**: členovia/pozvánky/roly, obdobie, typy, verzované pravidlá, výzvy, správy, audit a CSV kurzových dát (aktivity, členovia, odmeny, výzvy, splnenia, oznámenia, adresáti, komentáre a reakcie). Organizátor môže prepínať bežné zobrazenie; serverové oprávnenia ostávajú.
+Hlavná navigácia má **Domov** a **Všetci**. Výzvy, profil, správy a administrácia sú samostatne dostupné cez ponuku, avatar alebo zvonček.
+
+- **Domov:** vlastný denník, jediný vstup Pridať aktivitu, denné motto, vlastný týždenný/mesačný kalendár, štatistiky, zbierka, osobná pripnutá správa a samostatná zimná krajina otužovania.
+- **Všetci:** prepínač Aktivity/Prehľad. Spoločné zápisy, fotografie a komentáre, abecedná skupina s týždenným alebo skutočným mesačným kalendárom, detail dňa/človeka. Voľby zobrazenia sa pamätajú pre aktuálneho člena.
+- **Výzvy a odmeny:** päť pôvodných drahokamov, presné podmienky a započítané záznamy, publikované výzvy, praktické odznaky, osobné ocenenia a história odmien.
+- **Profil a nastavenia:** prezývka, fotografia s výrezom, heslo, animácie medvedíka/osláv, dobrovoľný push a odhlásenie. Pôvodný tab Ja sa nepoužíva.
+- **Správy:** vlastné doručené správy a osobný archív. Potvrdenie pripnutej správy ju skryje len aktuálnemu človeku.
+- **Administrácia:** členovia/pozvánky, termíny, typy, verzované pravidlá, vizuály, výzvy, osobné ocenenia, citáty, správy, štatistiky/nominácie, audit, CSV a samostatný potvrdený štart novej prípravy. Prepínač účastníckeho zobrazenia je hore; serverové oprávnenia sa nemenia.
 
 ## Dáta a súkromie
 
@@ -17,7 +19,9 @@ Povinné sú typ a deň aktivity. Trvanie, kilometre a poznámka sú voliteľné
 
 Texty sa zobrazujú ako React text, nikdy HTML. Používateľ môže meniť svoje komentáre a aktivity; organizátor môže odstrániť nevhodný obsah s auditom. Žiadne odmeny za lajky alebo komentáre.
 
-Studená sprcha a noc vonku sú serverové skryté koncepty. Neodchádzajú účastníkovi v API, počítadlách, grafoch ani klientskom seede. Publikovanie naraz odhalí výzvu a jej úlohu; druhá ostáva skrytá. Úlohy sa nezapočítavajú do tréningových minút ani pohybových dní.
+Studená sprcha alebo otužovanie a noc vonku začínajú ako skryté koncepty. Otužovanie má navyše odomknutie najskôr od ôsmeho dňa prípravy a samostatnú tabuľku. Po zverejnení a odomknutí vzniká najviac jedna vločka na člena/deň; skupina vidí dátum/druh a súhrny, poznámku iba autor a organizátor. Otužovanie ani iné úlohy nevytvárajú pohybové dni/minúty. Skryté koncepty sa neposielajú v účastníckom API, grafoch, obrázkoch ani oznámeniach.
+
+Fotografie aktivity (najviac päť, vstup do 10 MB) a samostatné avatary sa overujú, dekódujú a preukladajú bez EXIF/GPS. JPEG/PNG/WebP sa zmenšia do 2048 px, avatar má výrez do 512 px. Prístup kontroluje kurz a členstvo; nemožno verejne čítať médium iba znalosťou jeho ID. Nové fotky sa najprv nahrávajú súkromne; pripojenie k aktivite je atómové. Cleanup po nejasnom výsledku uloženia nesmie odstrániť už priradenú fotografiu.
 
 Nový člen dostane **iba oznámenia odoslané po jeho pridaní**. Žiadne automatické sprístupnenie starých hromadných ani cielených správ. Adresáti sa pri odoslaní trvalo uložia. Opakované odoslanie toho istého konceptu nevytvorí druhú správu ani druhé push úlohy. Neskoršia úprava textu nový push neodošle.
 
@@ -25,7 +29,15 @@ Nový člen dostane **iba oznámenia odoslané po jeho pridaní**. Žiadne autom
 
 Päť odmien: **Pravidelnosť, Pohyb, Sila, Pestrosť, Výbava**. Presné pravidlá v GAMIFICATION.md a pri každej odmene. Neprítomnosť nič neodoberá. Oprava chybného záznamu však nárok prepočíta. Týždenná zmena parametrov platí od ďalšieho pondelka; celokurzová až po aktuálnom období. Spätný prepočet vyžaduje samostatný, časovo obmedzený náhľad a potvrdenie; zmena dát náhľad zneplatní. Po prvých záznamoch nemožno posúvať začiatok prípravy bez migrácie.
 
-## PWA, výpadky a veverička
+## Osobné ocenenia, denné mottá a ročníky
+
+Odmena môže byť drahokam, symbol s farbou alebo autorizovaný vlastný obrázok. Praktické vlastné potvrdenia a organizačné poďakovania majú vlastné podmienky a snapshoty; 13 východiskových šablón je najprv draft. Administrátorské maximá a nominácie majú presné definície, remízy a rozdelenie medzi oprávnených kandidátov. Verejný rebríček nevzniká.
+
+Osem východiskových mott má doloženého autora/dielo, zdroj a označený slovenský preklad. Denný výber sa riadi časovým pásmom kurzu, poradie a interval upraví admin. Už zobrazený citát je pre celý miestny deň stabilný.
+
+Ročník, príprava a hlavná udalosť majú samostatné dátumy. Existujúca príprava sa aktualizáciou nemaže. Nový štart má presný desaťminútový náhľad, explicitné potvrdenie a povinnú úplnú zálohu. Zachová prihlásenie konajúceho organizátora, účty iných kurzov a konfiguráciu; voliteľne členov rovnakej skupiny. Výmaz dát a zmena obdobia sú jedna transakcia. Pozri ADMINISTRATOR.md.
+
+## PWA, výpadky a medvedík
 
 Manifest a service worker podporujú inštaláciu a dobrovoľný push. Service worker necachuje súkromné API ani neimplementuje offline synchronizáciu. Neúspešné uloženie zachová formulár; úspech sa ukáže až po odpovedi servera. Odhlásenie vyprázdni React stav a zruší push aktuálneho zariadenia. Doručenie push poskytovateľovi nie je prečítanie ani garancia doručenia.
 
@@ -33,4 +45,4 @@ Originálna ilustrácia má skrytý a vykuknutý stav. Automatické vystúpenia 
 
 ## Hranice
 
-Bez GPS/Strava, AI trénera, fyzickej pripravenosti v percentách, rebríčka, povinných sérií, pokút, meny, obchodu, mapy, pasu/pečiatok, chatu, rodiniek, fotiek či platieb. Dobrovoľné e-mailové novinky nie sú implementované; v UI nemajú nefunkčný prepínač. Jednorazový prihlasovací kód a pozvánky sú transakčné e-maily.
+Bez GPS/Strava integrácie, AI trénera, fyzickej pripravenosti v percentách, verejného rebríčka, povinných sérií, pokút, meny, obchodu, mapy, pasu, chatu, rodiniek či platieb. Administrátorské štatistiky a súkromné fotografie sú povolené rozšírenie; nezakladajú zdravotné skóre. Dobrovoľné e-mailové novinky nie sú implementované; v UI nemajú nefunkčný prepínač. Jednorazový prihlasovací kód a pozvánky sú transakčné e-maily.
