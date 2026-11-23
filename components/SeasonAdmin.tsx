@@ -474,7 +474,7 @@ export function PersonalAwardsAdmin({
         </label>
         {alreadyGranted && (
           <p className="muted">
-            Tento človek už má vybrané ocenenie. Históriu nájdeš nižšie.
+            Tento účastník už má vybrané ocenenie. Históriu nájdeš nižšie.
           </p>
         )}
         <button

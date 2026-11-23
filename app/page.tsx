@@ -3,7 +3,7 @@ import { appPath } from "../lib/paths";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Users,
-  Diamond,
+  Gem,
   UserRound,
   Plus,
   Bell,
@@ -31,6 +31,9 @@ import Together from "../components/Together";
 import Overview from "../components/Overview";
 import MeView from "../components/MeView";
 import Rewards from "../components/Rewards";
+import Notifications, {
+  useUnreadNotifications,
+} from "../components/Notifications";
 import AdminPanel from "../components/AdminPanel";
 import PushSettings, { disconnectPush } from "../components/PushSettings";
 import Squirrel from "../components/Squirrel";
@@ -46,7 +49,7 @@ export const dynamic = "force-dynamic";
 const navigation = [
   { id: "spolu", name: "Spolu", icon: Users },
   { id: "prehlad", name: "Prehľad", icon: CalendarDays },
-  { id: "vyzvy", name: "Výzvy", icon: Diamond },
+  { id: "vyzvy", name: "Výzvy", icon: Gem },
   { id: "ja", name: "Ja", icon: UserRound },
 ];
 const MAIN_VIEWS = ["spolu", "prehlad", "vyzvy", "ja"];
@@ -338,6 +341,7 @@ export default function Page() {
       );
     }
   }
+  const unreadNotifications = useUnreadNotifications(state);
   if (loading)
     return (
       <main className="access-screen">
@@ -427,6 +431,7 @@ export default function Page() {
       (m) => m.status === "sent" && !m.readAt && !m.archivedAt,
     ).length,
     isAdmin = state.me.role === "admin" && !participantView;
+  const unreadSocial = unreadNotifications.length;
   const activeView = view === "admin" && !isAdmin ? "spolu" : view;
   const isMain = MAIN_VIEWS.includes(activeView);
   const pending = isAdmin ? state.pendingAccounts || 0 : 0;
@@ -474,7 +479,8 @@ export default function Page() {
             onClick={() => navigate("messages")}
           >
             <Bell size={18} />
-            Správy{unread > 0 ? ` (${unread})` : ""}
+            Správy
+            {unread + unreadSocial > 0 ? ` (${unread + unreadSocial})` : ""}
           </button>
           <button
             className={`side-setting ${activeView === "help" ? "active" : ""}`}
@@ -546,11 +552,13 @@ export default function Page() {
             )}
             <button
               className={`notification-button ${activeView === "messages" ? "active" : ""}`}
-              aria-label={`Správy, ${unread} neprečítaných`}
+              aria-label={`Správy a notifikácie, ${unread + unreadSocial} nových`}
               onClick={() => navigate("messages")}
             >
               <Bell size={22} />
-              {unread > 0 && <span>{unread}</span>}
+              {unread + unreadSocial > 0 && (
+                <span>{unread + unreadSocial}</span>
+              )}
             </button>
           </div>
         </header>
@@ -641,6 +649,11 @@ export default function Page() {
               action={action}
               opened={openedMessage}
               setOpened={setOpenedMessage}
+              unreadNotifications={unreadSocial}
+              onOpenActivity={(id) => {
+                navigate("spolu");
+                setFocusActivity(id);
+              }}
             />
           )}
           {activeView === "admin" && isAdmin && (
@@ -848,14 +861,19 @@ function Messages({
   action,
   opened,
   setOpened,
+  onOpenActivity,
+  unreadNotifications,
 }: {
   state: AppState;
   action: (a: string, d?: Record<string, unknown>) => Promise<any>;
   opened: string | null;
   setOpened: (s: string | null) => void;
+  onOpenActivity: (id: string) => void;
+  unreadNotifications: number;
 }) {
   const [error, setError] = useState("");
   const [archive, setArchive] = useState(false);
+  const [social, setSocial] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const all = state.messages
     .filter((m) => m.status === "sent")
@@ -879,125 +897,147 @@ function Messages({
         aria-label="Priečinok správ"
       >
         <button
-          aria-pressed={!archive}
+          aria-pressed={!archive && !social}
           onClick={() => {
             setArchive(false);
+            setSocial(false);
             setOpened(null);
           }}
         >
           Správy
         </button>
         <button
-          aria-pressed={archive}
+          aria-pressed={archive && !social}
           onClick={() => {
             setArchive(true);
+            setSocial(false);
             setOpened(null);
           }}
         >
           <Archive size={16} />
           Archív · {all.filter((m) => m.archivedAt).length}
         </button>
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {opened && !all.some((m) => m.id === opened) && (
-        <p className="info-note">
-          Táto správa už nie je dostupná alebo nie je určená tvojmu účtu.
-          Ostatné správy nájdeš nižšie.
-        </p>
-      )}
-      {!messages.length ? (
-        <Empty
-          title={
-            archive
-              ? "Archív je zatiaľ prázdny"
-              : "Všetko prečítané? Tu budú nové správy."
-          }
+        <button
+          aria-pressed={social}
+          onClick={() => {
+            setSocial(true);
+            setOpened(null);
+          }}
         >
-          {archive
-            ? "Sem sa presunú správy, ktoré vezmeš na vedomie."
-            : "Oznámenia organizátorov ostávajú dostupné aj bez zapnutých upozornení."}
-        </Empty>
+          Notifikácie
+          {unreadNotifications > 0 && (
+            <em className="cz-badge">{unreadNotifications}</em>
+          )}
+        </button>
+      </div>
+      {social ? (
+        <Notifications state={state} onOpenActivity={onOpenActivity} />
       ) : (
-        messages.map((m) => (
-          <article
-            key={m.id}
-            className={`message-card ${!m.readAt ? "unread" : ""}`}
-          >
-            <button
-              className="message-title"
-              onClick={() => setOpened(opened === m.id ? null : m.id)}
-              aria-expanded={opened === m.id}
+        <>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {opened && !all.some((m) => m.id === opened) && (
+            <p className="info-note">
+              Táto správa už nie je dostupná alebo nie je určená tvojmu účtu.
+              Ostatné správy nájdeš nižšie.
+            </p>
+          )}
+          {!messages.length ? (
+            <Empty
+              title={
+                archive
+                  ? "Archív je zatiaľ prázdny"
+                  : "Všetko prečítané? Tu budú nové správy."
+              }
             >
-              <span className="message-bell">
-                <Bell size={20} />
-              </span>
-              <span>
-                <span className="message-meta">
-                  {m.important && <span className="pill soft">Dôležité</span>}
-                  {!m.readAt && (
-                    <span className="unread-label">Neprečítané</span>
-                  )}
-                  <time>{fmt(m.sentAt || m.createdAt)}</time>
-                </span>
-                <h2>{m.title}</h2>
-                {opened !== m.id && (
-                  <p>
-                    {m.body.slice(0, 135)}
-                    {m.body.length > 135 ? "…" : ""}
-                  </p>
-                )}
-              </span>
-              <ChevronRight size={20} />
-            </button>
-            {opened === m.id && (
-              <div className="message-content">
-                <p className="pre-wrap">{m.body}</p>
-                {m.link && (
-                  <a className="button secondary" href={appPath(m.link)}>
-                    Otvoriť odkaz <ArrowRight size={16} />
-                  </a>
-                )}
+              {archive
+                ? "Sem sa presunú správy, ktoré vezmeš na vedomie."
+                : "Oznámenia organizátorov ostávajú dostupné aj bez zapnutých upozornení."}
+            </Empty>
+          ) : (
+            messages.map((m) => (
+              <article
+                key={m.id}
+                className={`message-card ${!m.readAt ? "unread" : ""}`}
+              >
                 <button
-                  className="button secondary"
-                  disabled={busy === m.id}
-                  onClick={async () => {
-                    setBusy(m.id);
-                    setError("");
-                    try {
-                      await action("archiveMessage", {
-                        id: m.id,
-                        archived: !m.archivedAt,
-                      });
-                      setOpened(null);
-                    } catch (e) {
-                      setError(
-                        e instanceof Error
-                          ? e.message
-                          : "Správu sa nepodarilo presunúť.",
-                      );
-                    } finally {
-                      setBusy(null);
-                    }
-                  }}
+                  className="message-title"
+                  onClick={() => setOpened(opened === m.id ? null : m.id)}
+                  aria-expanded={opened === m.id}
                 >
-                  <Archive size={16} />
-                  {busy === m.id
-                    ? "Ukladám…"
-                    : m.archivedAt
-                      ? "Vrátiť medzi správy"
-                      : "Beriem na vedomie · archivovať"}
+                  <span className="message-bell">
+                    <Bell size={20} />
+                  </span>
+                  <span>
+                    <span className="message-meta">
+                      {m.important && (
+                        <span className="pill soft">Dôležité</span>
+                      )}
+                      {!m.readAt && (
+                        <span className="unread-label">Neprečítané</span>
+                      )}
+                      <time>{fmt(m.sentAt || m.createdAt)}</time>
+                    </span>
+                    <h2>{m.title}</h2>
+                    {opened !== m.id && (
+                      <p>
+                        {m.body.slice(0, 135)}
+                        {m.body.length > 135 ? "…" : ""}
+                      </p>
+                    )}
+                  </span>
+                  <ChevronRight size={20} />
                 </button>
-                <span className="small muted">
-                  Táto zmena sa týka iba tvojho účtu.
-                </span>
-              </div>
-            )}
-          </article>
-        ))
+                {opened === m.id && (
+                  <div className="message-content">
+                    <p className="pre-wrap">{m.body}</p>
+                    {m.link && (
+                      <a className="button secondary" href={appPath(m.link)}>
+                        Otvoriť odkaz <ArrowRight size={16} />
+                      </a>
+                    )}
+                    <button
+                      className="button secondary"
+                      disabled={busy === m.id}
+                      onClick={async () => {
+                        setBusy(m.id);
+                        setError("");
+                        try {
+                          await action("archiveMessage", {
+                            id: m.id,
+                            archived: !m.archivedAt,
+                          });
+                          setOpened(null);
+                        } catch (e) {
+                          setError(
+                            e instanceof Error
+                              ? e.message
+                              : "Správu sa nepodarilo presunúť.",
+                          );
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      <Archive size={16} />
+                      {busy === m.id
+                        ? "Ukladám…"
+                        : m.archivedAt
+                          ? "Vrátiť medzi správy"
+                          : "Beriem na vedomie · archivovať"}
+                    </button>
+                    <span className="small muted">
+                      Táto zmena sa týka iba tvojho účtu.
+                    </span>
+                  </div>
+                )}
+              </article>
+            ))
+          )}
+        </>
       )}
     </section>
   );

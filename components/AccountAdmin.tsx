@@ -257,7 +257,7 @@ export default function AccountAdmin({
             <p className="small muted">
               Platí do {timestamp(issued.expiresAt)}.{" "}
               {issued.kind === "reset"
-                ? "Je jednorazový. Odovzdaj ho iba tomuto človeku po overení, že o obnovu požiadal. Po nastavení hesla sa jeho účet odhlási zo všetkých zariadení."
+                ? "Je jednorazový. Odovzdaj ho iba tomuto účastníkovi po overení, že o obnovu požiadal. Po nastavení hesla sa jeho účet odhlási zo všetkých zariadení."
                 : "Každý s týmto odkazom môže vytvoriť účet v kurze až do vyčerpania limitu alebo zrušenia pozvánky."}
             </p>
             <p className="small muted">
@@ -466,7 +466,7 @@ export default function AccountAdmin({
               if (!member) return;
               if (
                 window.confirm(
-                  `Vytvoriť jednorazový odkaz na nové heslo pre ${member.nickname}? Odovzdaj ho iba tomuto človeku. Použitie odkazu ukončí jeho doterajšie prihlásenia.`,
+                  `Vytvoriť jednorazový odkaz na nové heslo pre ${member.nickname}? Odovzdaj ho iba tomuto účastníkovi. Použitie odkazu ukončí jeho doterajšie prihlásenia.`,
                 )
               )
                 await run(
@@ -479,8 +479,8 @@ export default function AccountAdmin({
           >
             <h3>Pomoc so zabudnutým heslom</h3>
             <p className="muted">
-              Pôvodné heslo sa nezobrazuje. Po overení človeka mu môžeš odovzdať
-              jednorazový odkaz, cez ktorý si zvolí nové.
+              Pôvodné heslo sa nezobrazuje. Po overení účastníka mu môžeš
+              odovzdať jednorazový odkaz, cez ktorý si zvolí nové.
             </p>
             <label className="field">
               Účet

@@ -207,7 +207,7 @@ export default function ColdPanel({
       <div
         className="winter-landscape"
         role="img"
-        aria-label={`Dnes otužovanie zaznamenalo ${peopleToday} z ${cold.activeCount} ľudí. Každá vločka predstavuje jedného človeka.`}
+        aria-label={`Dnes otužovanie zaznamenalo ${peopleToday} z ${cold.activeCount} účastníkov. Každá vločka predstavuje jedného účastníka.`}
       >
         <svg viewBox="0 0 440 190" aria-hidden="true">
           <defs>
@@ -284,11 +284,12 @@ export default function ColdPanel({
           {peopleToday}
           <span> / {cold.activeCount}</span>
         </strong>
-        <span>ľudí dnes pridalo vločku</span>
+        <span>účastníkov dnes pridalo vločku</span>
       </div>
       <p className="small muted">
-        Každý človek pridá najviac jednu vločku denne. Spolu už {cold.entryDays}{" "}
-        dní otužovania od {cold.people} ľudí.
+        Každý účastník pridá najviac jednu vločku denne. Spolu už{" "}
+        {cold.entryDays} dní otužovania od {cold.people}{" "}
+        {cold.people === 1 ? "účastníka" : "účastníkov"}.
       </p>
       {cold.canRecord && (
         <button

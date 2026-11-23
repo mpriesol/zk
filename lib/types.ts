@@ -195,6 +195,20 @@ export interface AppState {
   personalAwards?: PersonalAwardGrant[];
   motto?: Motto | null;
   pendingAccounts?: number;
+  /** Support and comments others gave to my activities, newest first. */
+  notifications?: SocialNotification[];
+}
+export interface SocialNotification {
+  id: string;
+  kind: "reaction" | "comment";
+  activityId: string;
+  actorId: string;
+  actorNickname: string;
+  typeName: string;
+  activityDate: string;
+  /** Null for support given before times were recorded. */
+  at: string | null;
+  body?: string;
 }
 export interface MediaAsset {
   id: string;

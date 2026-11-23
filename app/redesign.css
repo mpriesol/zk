@@ -1728,13 +1728,20 @@ body:has(.cz-shell) {
   .cz-tabbar.mobile-navigation button.active {
     color: var(--cz-text-teal);
   }
+  .cz-tabbar.mobile-navigation button {
+    padding: 0;
+    justify-content: center;
+    align-items: center;
+  }
   .cz-tabbar.mobile-navigation button.active::before {
     content: "";
     position: absolute;
     top: 0;
-    left: 22%;
-    right: 22%;
+    left: 50%;
+    width: 32px;
+    margin-left: -16px;
     height: 3px;
+    border-radius: 0 0 2px 2px;
     background: var(--cz-action);
   }
   .cz-tabbar .avatar.tiny {
@@ -2184,4 +2191,212 @@ body:has(.cz-shell) {
 }
 .cz-card {
   scroll-margin-top: 68px;
+}
+
+/* Prehľad: all weeks of the preparation in one horizontal scroller */
+.cz-weeks {
+  display: grid;
+  grid-template-columns: minmax(96px, 26%) minmax(0, 1fr) 30px;
+  padding: 4px 12px 4px 14px;
+  touch-action: auto;
+}
+.cz-weeks-headcell {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--cz-muted);
+}
+.cz-weeks-row {
+  height: 56px;
+  min-height: 56px;
+  border-top: 1px solid var(--cz-line-soft);
+}
+.cz-weeks-count .cz-weeks-headcell,
+.cz-weeks-count .cz-weeks-row {
+  justify-content: flex-end;
+  display: flex;
+  align-items: center;
+}
+.cz-weeks-names,
+.cz-weeks-count {
+  min-width: 0;
+}
+.cz-weeks-names .cz-person-name {
+  width: 100%;
+}
+.cz-weeks-track {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+}
+.cz-weeks-track::-webkit-scrollbar {
+  display: none;
+}
+.cz-week {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  padding: 0 5px;
+  box-sizing: border-box;
+}
+.cz-week-days,
+.cz-week-cells {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+.cz-week-days span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+}
+.cz-week-days small {
+  font-size: 10px;
+  opacity: 0.8;
+}
+.cz-week-days .today {
+  color: var(--cz-ink);
+  font-weight: 700;
+}
+/* member detail head with tappable avatar */
+.cz-member-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+.cz-member-head > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.cz-member-head strong {
+  font-family: "Titillium Web", "Open Sans", sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+}
+.cz-member-head small {
+  color: var(--cz-muted);
+}
+.cz-member-avatar {
+  border: 0;
+  padding: 0;
+  background: none;
+  border-radius: 50%;
+  line-height: 0;
+}
+button.cz-member-avatar {
+  cursor: zoom-in;
+}
+.cz-member-avatar .avatar.large {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  overflow: hidden;
+}
+.cz-member-avatar .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@media (max-width: 760px) {
+  .cz-weeks {
+    grid-template-columns: minmax(86px, 25%) minmax(0, 1fr) 24px;
+    padding: 4px 10px 4px 12px;
+  }
+  .cz-week {
+    padding: 0 4px;
+  }
+  .cz-week-days,
+  .cz-week-cells {
+    gap: 2px;
+  }
+}
+
+/* Správy → Notifikácie: who supported or commented on my entries */
+.cz-notifications {
+  padding: 0;
+  overflow: hidden;
+}
+.cz-notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--cz-line-soft);
+  background: none;
+  text-align: left;
+  color: var(--cz-ink);
+  font: inherit;
+}
+.cz-notification:first-child {
+  border-top: 0;
+}
+.cz-notification.fresh {
+  background: #f1f7f6;
+}
+.cz-notification-avatar {
+  position: relative;
+  flex: none;
+  line-height: 0;
+}
+.cz-notification-kind {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--cz-paper);
+  box-shadow: 0 0 0 1px var(--cz-line);
+}
+.cz-notification-kind.reaction {
+  color: var(--cz-heart);
+}
+.cz-notification-kind.comment {
+  color: var(--cz-action);
+}
+.cz-notification-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.cz-notification-text strong {
+  font-weight: 600;
+}
+.cz-notification-text q {
+  color: var(--cz-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.cz-notification-text small {
+  color: var(--cz-muted);
+  font-size: 12px;
+}
+.cz-new {
+  color: var(--cz-heart);
+  font-weight: 700;
+}
+.segmented .cz-badge {
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
 }

@@ -196,7 +196,7 @@ export default function AdminStatistics({
         <p>
           Prehľad vychádza zo zapísaných údajov. V „Najviac“ nájdeš skutočné
           maximá aj remízy. Nominácie majú vlastnú podmienku a umožnia poďakovať
-          viacerým ľuďom.
+          viacerým účastníkom.
         </p>
         <div className="grid-two">
           <label className="field">
@@ -234,7 +234,7 @@ export default function AdminStatistics({
               setChoices({});
             }}
           />
-          Zahrnúť aj ľudí s neaktívnym členstvom
+          Zahrnúť aj účastníkov s neaktívnym členstvom
         </label>
         {calculation.error && (
           <p className="error" role="alert">
@@ -245,8 +245,8 @@ export default function AdminStatistics({
           <>
             <p>
               <strong>{format(report.totals.activities)}</strong> zápisov pohybu
-              · <strong>{format(report.totals.activeMembers)}</strong> ľudí s
-              pohybom z {format(report.totals.members)} členov
+              · <strong>{format(report.totals.activeMembers)}</strong>{" "}
+              účastníkov s pohybom z {format(report.totals.members)} členov
             </p>
             <p className="small muted">
               Čas chýba pri {report.totals.missingMinutes} zápisoch, vzdialenosť
@@ -279,18 +279,18 @@ export default function AdminStatistics({
                   setChoices({});
                 }}
               />
-              Rozdeľ ocenenia medzi čo najviac ľudí
+              Rozdeľ ocenenia medzi čo najviac účastníkov
             </label>
             <p className="small muted">
               Vyber kategórie nižšie. Automatický návrh rozdeľuje iba medzi
-              ľudí, ktorí spĺňajú podmienku. Pri maxime vyberá len spomedzi
-              remizujúcich. Výber môžeš ručne upraviť.
+              účastníkov, ktorí spĺňajú podmienku. Pri maxime vyberá len
+              spomedzi remizujúcich. Výber môžeš ručne upraviť.
             </p>
             {selected.length ? (
               <>
                 <p>
                   <strong>{selected.length}</strong> kategórií pre{" "}
-                  <strong>{selectedPeople.size}</strong> rôznych ľudí.{" "}
+                  <strong>{selectedPeople.size}</strong> rôznych účastníkov.{" "}
                   {Object.keys(choices).length > 0
                     ? "Návrh obsahuje tvoje ručné úpravy."
                     : ""}
@@ -371,7 +371,7 @@ export default function AdminStatistics({
           {view === "nominations" && (
             <section className="stack">
               <p className="muted">
-                Každý uvedený človek spĺňa rovnakú podmienku. Poradie mien
+                Každý uvedený účastník spĺňa rovnakú podmienku. Poradie mien
                 neznamená poradie výkonu.
               </p>
               {report.nominations

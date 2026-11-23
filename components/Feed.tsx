@@ -606,7 +606,7 @@ export default function Feed({
         <Modal title="Filtrovať aktivity" onClose={() => setFiltersOpen(false)}>
           <div className="stack">
             <label className="field">
-              Človek
+              Účastník
               <select
                 value={person}
                 onChange={(e) => setPerson(e.target.value)}

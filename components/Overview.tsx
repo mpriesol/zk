@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   ChevronRight,
@@ -127,12 +127,50 @@ export function MemberDetail({
   const personal = (state.personalAwards || []).filter(
     (a) => a.memberId === member.id,
   );
+  const [photo, setPhoto] = useState(false);
   return (
     <Modal
       title={`${member.nickname}${date ? " · " + fmt(date, { weekday: "short", day: "numeric", month: "numeric" }) : ""}`}
       onClose={onClose}
       wide
     >
+      {!date && (
+        <div className="cz-member-head">
+          {member.avatarUrl ? (
+            <button
+              type="button"
+              className="cz-member-avatar"
+              aria-label={`Zobraziť fotku: ${member.nickname}`}
+              onClick={() => setPhoto(true)}
+            >
+              <Avatar
+                name={member.nickname}
+                imageUrl={member.avatarUrl}
+                size="large"
+              />
+            </button>
+          ) : (
+            <span className="cz-member-avatar">
+              <Avatar name={member.nickname} size="large" />
+            </span>
+          )}
+          <span>
+            <strong>{member.nickname}</strong>
+            <small>
+              {member.id === state.me.id
+                ? "Tvoja príprava"
+                : "Prehľad prípravy"}
+            </small>
+          </span>
+        </div>
+      )}
+      {photo && member.avatarUrl && (
+        <Modal title={member.nickname} onClose={() => setPhoto(false)} wide>
+          <div className="photo-lightbox">
+            <img src={member.avatarUrl} alt={`Fotka: ${member.nickname}`} />
+          </div>
+        </Modal>
+      )}
       {date && (
         <button type="button" className="cz-link" onClick={() => onDate()}>
           ← Celá príprava
@@ -257,6 +295,81 @@ export default function Overview({
     },
   );
   const weekDays = calendarDays("week", anchor).days;
+  // Every week of the preparation, oldest first, side by side in one scroller.
+  const weeks = useMemo(() => {
+    const list: string[] = [];
+    const first = calendarBounds("week", state.course.startDate).start;
+    const last = calendarBounds("week", state.today).start;
+    for (let w = first; w <= last && list.length < 60; w = add(w, 7))
+      list.push(w);
+    return list.length ? list : [last];
+  }, [state.course.startDate, state.today]);
+  const byDay = useMemo(() => {
+    const map = new Map<string, Activity[]>();
+    for (const a of state.activities) {
+      if (a.group === "task") continue;
+      const k = `${a.memberId}|${a.date}`;
+      const list = map.get(k);
+      if (list) list.push(a);
+      else map.set(k, [a]);
+    }
+    return map;
+  }, [state.activities]);
+  const track = useRef<HTMLDivElement>(null);
+  const fromScroll = useRef(false);
+  const firstScroll = useRef(true);
+  const weekIndex = Math.max(0, weeks.indexOf(start));
+  useEffect(() => {
+    const el = track.current;
+    if (range !== "week" || !el) return;
+    if (fromScroll.current) {
+      fromScroll.current = false;
+      return;
+    }
+    const left = weekIndex * el.clientWidth;
+    if (Math.abs(el.scrollLeft - left) < 2) return;
+    el.scrollTo({
+      left,
+      behavior: firstScroll.current ? "auto" : "smooth",
+    });
+    firstScroll.current = false;
+  }, [range, weekIndex]);
+  useEffect(() => {
+    if (range !== "week") firstScroll.current = true;
+  }, [range]);
+  // Keep the visible week when the width changes (rotation, window resize).
+  const indexRef = useRef(weekIndex);
+  indexRef.current = weekIndex;
+  const resizing = useRef(false);
+  useEffect(() => {
+    const el = track.current;
+    if (range !== "week" || !el || typeof ResizeObserver === "undefined")
+      return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (!el.clientWidth || el.clientWidth === width) return;
+      width = el.clientWidth;
+      resizing.current = true;
+      el.scrollTo({ left: indexRef.current * width, behavior: "auto" });
+      requestAnimationFrame(() => {
+        resizing.current = false;
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [range]);
+  const onTrackScroll = () => {
+    const el = track.current;
+    if (!el || !el.clientWidth || resizing.current) return;
+    const index = Math.min(
+      weeks.length - 1,
+      Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
+    );
+    if (index !== weekIndex) {
+      fromScroll.current = true;
+      setAnchor(weeks[index]);
+    }
+  };
   const monthDays: string[] = [];
   for (let d = start; d <= end; d = add(d, 1)) monthDays.push(d);
   const members = [...state.members]
@@ -289,7 +402,7 @@ export default function Overview({
         <p className="cz-overview-summary">
           <strong>
             {activePeople} z {members.length}{" "}
-            {plural(members.length, "človeka", "ľudí", "ľudí")}
+            {plural(members.length, "účastníka", "účastníkov", "účastníkov")}
           </strong>{" "}
           sa {range === "week" ? "tento týždeň" : "tento mesiac"} hýbalo ·{" "}
           {inRange.length}{" "}
@@ -299,7 +412,7 @@ export default function Overview({
               <br />
               <span className="cz-cold-text">
                 Otužovanie: {coldPeople}{" "}
-                {plural(coldPeople, "človek", "ľudia", "ľudí")}
+                {plural(coldPeople, "účastník", "účastníci", "účastníkov")}
               </span>
             </>
           )}
@@ -307,74 +420,114 @@ export default function Overview({
       </section>
       {range === "week" ? (
         <section
-          className={`cz-block cz-people ${slide}`}
-          key={`week-${start}`}
-          aria-label="Týždeň po ľuďoch"
-          onAnimationEnd={() => setSlide("")}
-          {...swipe}
+          className="cz-block cz-people cz-weeks"
+          aria-label="Týždne prípravy po účastníkoch"
         >
-          <div className="cz-people-head" aria-hidden="true">
-            <span>Podľa mena</span>
-            {weekDays.map((d, i) => (
-              <span key={d} className={d === state.today ? "today" : ""}>
-                {["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}
-              </span>
+          <div className="cz-weeks-names">
+            <span className="cz-weeks-headcell" aria-hidden="true">
+              Podľa mena
+            </span>
+            {members.map((member) => (
+              <button
+                type="button"
+                key={member.id}
+                className="cz-person-name cz-weeks-row"
+                onClick={() => setDetail({ member })}
+              >
+                <Avatar
+                  name={member.nickname}
+                  imageUrl={member.avatarUrl}
+                  size="small"
+                />
+                <span>
+                  {member.nickname}
+                  {member.id === state.me.id && <small> · ty</small>}
+                </span>
+              </button>
             ))}
-            <span>dni</span>
           </div>
-          {members.map((member) => {
-            const own = state.activities.filter(
-              (a) => a.memberId === member.id && a.group !== "task",
-            );
-            const days = new Set(
-              own.filter((a) => weekDays.includes(a.date)).map((a) => a.date),
-            ).size;
-            return (
-              <div className="cz-person-row" key={member.id}>
-                <button
-                  type="button"
-                  className="cz-person-name"
-                  onClick={() => setDetail({ member })}
+          <div
+            className="cz-weeks-track"
+            ref={track}
+            onScroll={onTrackScroll}
+            tabIndex={-1}
+          >
+            {weeks.map((week) => {
+              const days = calendarDays("week", week).days;
+              return (
+                <div
+                  className="cz-week"
+                  key={week}
+                  aria-label={`Týždeň ${fmt(days[0])} – ${fmt(days[6])}`}
                 >
-                  <Avatar
-                    name={member.nickname}
-                    imageUrl={member.avatarUrl}
-                    size="small"
-                  />
-                  <span>
-                    {member.nickname}
-                    {member.id === state.me.id && <small> · ty</small>}
-                  </span>
-                </button>
-                {weekDays.map((date) => {
-                  const items = own.filter((a) => a.date === date);
-                  const cold = hasCold(member.id, date);
-                  const label = `${member.nickname}, ${fmt(date, { weekday: "long", day: "numeric", month: "numeric" })}: ${items.length ? items.map((a) => a.typeName).join(", ") : "bez zápisu"}${cold ? ", otužovanie" : ""}`;
-                  const group = items[0]?.group || "none";
-                  return (
-                    <button
-                      type="button"
-                      key={date}
-                      className={`cz-cell ${items.length ? `g-${items.every((a) => a.group === group) ? group : "mix"}` : "is-empty"} ${date === state.today ? "today" : ""}`}
-                      disabled={date > state.today}
-                      aria-label={label}
-                      title={label}
-                      onClick={() => setDetail({ member, date })}
-                    >
-                      <DayIcons items={items} />
-                      <DayMarks items={items} cold={cold} meId={state.me.id} />
-                    </button>
-                  );
-                })}
-                <strong className="cz-days">{days || "–"}</strong>
-              </div>
-            );
-          })}
+                  <div className="cz-weeks-headcell cz-week-days">
+                    {days.map((d, i) => (
+                      <span
+                        key={d}
+                        className={d === state.today ? "today" : ""}
+                      >
+                        {["Po", "Ut", "St", "Št", "Pi", "So", "Ne"][i]}
+                        <small>{Number(d.slice(8, 10))}.</small>
+                      </span>
+                    ))}
+                  </div>
+                  {members.map((member) => (
+                    <div className="cz-weeks-row cz-week-cells" key={member.id}>
+                      {days.map((date) => {
+                        const items = byDay.get(`${member.id}|${date}`) || [];
+                        const cold = hasCold(member.id, date);
+                        const label = `${member.nickname}, ${fmt(date, { weekday: "long", day: "numeric", month: "numeric" })}: ${items.length ? items.map((a) => a.typeName).join(", ") : "bez zápisu"}${cold ? ", otužovanie" : ""}`;
+                        const group = items[0]?.group || "none";
+                        const outside =
+                          date > state.today || date < state.course.startDate;
+                        return (
+                          <button
+                            type="button"
+                            key={date}
+                            className={`cz-cell ${items.length ? `g-${items.every((a) => a.group === group) ? group : "mix"}` : "is-empty"} ${date === state.today ? "today" : ""}`}
+                            disabled={outside}
+                            aria-label={label}
+                            title={label}
+                            onClick={() => setDetail({ member, date })}
+                          >
+                            <DayIcons items={items} />
+                            <DayMarks
+                              items={items}
+                              cold={cold}
+                              meId={state.me.id}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          <div className="cz-weeks-count">
+            <span className="cz-weeks-headcell" aria-hidden="true">
+              dni
+            </span>
+            {members.map((member) => {
+              const days = new Set(
+                weekDays.filter((d) => byDay.has(`${member.id}|${d}`)),
+              ).size;
+              return (
+                <strong className="cz-days cz-weeks-row" key={member.id}>
+                  {days || "–"}
+                </strong>
+              );
+            })}
+          </div>
         </section>
       ) : (
         <section
-          className="cz-block cz-people month"
-          aria-label="Mesiac po ľuďoch"
+          className={`cz-block cz-people month ${slide}`}
+          key={`month-${start}`}
+          aria-label="Mesiac po účastníkoch"
+          onAnimationEnd={() => setSlide("")}
+          {...swipe}
         >
           {members.map((member) => {
             const own = new Set(
@@ -427,8 +580,9 @@ export default function Overview({
       )}
       <p className="cz-legend">
         <span className="cz-swipe-hint">
-          Potiahni prstom doľava alebo doprava pre iný{" "}
-          {range === "week" ? "týždeň" : "mesiac"}.
+          {range === "week"
+            ? "Posúvaj prstom doľava alebo doprava cez celú prípravu."
+            : "Potiahni prstom doľava alebo doprava pre iný mesiac."}
         </span>
         <span>
           <i className="g-foot" /> pohyb po vlastných

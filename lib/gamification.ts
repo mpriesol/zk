@@ -73,14 +73,14 @@ export function defaultRules(startDate: string): Rule[] {
       gem: "ametyst",
       period: "course",
       description:
-        "Počas prípravy spoj tri pohyby po vlastných po aspoň 30 minút s tromi cvičeniami po aspoň 15 minút. Vyváženie dvoch oblastí, nie súťaž v objeme. Raz za prípravu.",
+        "Počas prípravy spoj desať pohybov po vlastných po aspoň 30 minút s ôsmimi cvičeniami po aspoň 15 minút. Približne jedno z každého za týždeň; vyváženie dvoch oblastí, nie súťaž v objeme. Raz za prípravu.",
       condition: {
         kind: "combination",
         conditions: [
-          { kind: "activities", count: 3, groups: ["foot"], minMinutes: 30 },
+          { kind: "activities", count: 10, groups: ["foot"], minMinutes: 30 },
           {
             kind: "activities",
-            count: 3,
+            count: 8,
             groups: ["exercise"],
             minMinutes: 15,
           },
@@ -129,6 +129,29 @@ function qualifying(
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
+function pick(n: number, one: string, few: string, many: string) {
+  return n === 1 ? one : n >= 2 && n <= 4 ? few : many;
+}
+/** "Chýba ešte 1 aktivita (cvičenie, aspoň 15 min)." – natural Slovak. */
+function missingText(
+  condition: Extract<Condition, { kind: "days" | "activities" }>,
+  left: number,
+): string {
+  const verb = pick(left, "Chýba", "Chýbajú", "Chýba");
+  const noun =
+    condition.kind === "days"
+      ? pick(left, "pohybový deň", "pohybové dni", "pohybových dní")
+      : pick(left, "aktivita", "aktivity", "aktivít");
+  const details = [
+    condition.groups?.length
+      ? condition.groups.map((group) => GROUP_LABELS[group]).join(" alebo ")
+      : "",
+    condition.minMinutes !== undefined
+      ? `${condition.kind === "days" ? "s aktivitou " : ""}aspoň ${condition.minMinutes} min`
+      : "",
+  ].filter(Boolean);
+  return `${verb} ešte ${left} ${noun}${details.length ? ` (${details.join(", ")})` : ""}.`;
+}
 function conditionDescription(
   condition: Extract<Condition, { kind: "days" | "activities" }>,
 ): string {
@@ -189,7 +212,7 @@ export function evaluateCondition(
       missing:
         current >= condition.count
           ? "Praktická úloha je potvrdená."
-          : `Zostáva potvrdiť: ${condition.count - current}.`,
+          : "Chýba ešte potvrdenie.",
     };
   }
   if (
@@ -214,7 +237,7 @@ export function evaluateCondition(
     countedActivityIds: included.map((activity) => activity.id),
     missing: complete
       ? "Podmienka splnená."
-      : `Zostáva ${condition.count - count} ${condition.kind === "days" ? "pohybových dní" : "aktivít"}: ${explanation}.`,
+      : missingText(condition, condition.count - count),
   };
 }
 
