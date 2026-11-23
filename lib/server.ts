@@ -11,6 +11,7 @@ import type {
   Message,
   Award,
   Condition,
+  SocialNotification,
 } from "./types.ts";
 import {
   defaultRules,
@@ -764,6 +765,40 @@ export async function handleRequest(
           .filter((r) => r.activity_id === a.id)
           .map((r) => r.member_id);
       }
+      const nicknameOf = new Map(members.map((m) => [m.id, m.nickname]));
+      const notifications: SocialNotification[] = [];
+      for (const a of activities.filter((x) => x.memberId === me.id)) {
+        for (const r of reactions)
+          if (r.activity_id === a.id && r.member_id !== me.id)
+            notifications.push({
+              id: `r:${r.id}`,
+              kind: "reaction",
+              activityId: a.id,
+              actorId: r.member_id,
+              actorNickname: nicknameOf.get(r.member_id) || "Účastník",
+              typeName: a.typeName,
+              activityDate: a.date,
+              at: r.created_at || null,
+            });
+        for (const c of a.comments || [])
+          if (c.memberId !== me.id)
+            notifications.push({
+              id: `c:${c.id}`,
+              kind: "comment",
+              activityId: a.id,
+              actorId: c.memberId,
+              actorNickname: c.nickname,
+              typeName: a.typeName,
+              activityDate: a.date,
+              at: c.createdAt,
+              body: c.body.length > 160 ? c.body.slice(0, 159) + "…" : c.body,
+            });
+      }
+      notifications.sort(
+        (x, y) =>
+          (y.at || "").localeCompare(x.at || "") ||
+          y.activityDate.localeCompare(x.activityDate),
+      );
       const challenges = challengeRows
         .filter((r) => {
           const ch: Challenge = JSON.parse(r.data);
@@ -860,6 +895,7 @@ export async function handleRequest(
           : {}),
         types: types.map(typeRow),
         activities,
+        notifications: notifications.slice(0, 200),
         rules,
         awards,
         challenges,
@@ -1438,10 +1474,11 @@ export async function handleRequest(
         else {
           await run(
             db,
-            "INSERT OR IGNORE INTO reactions(id,activity_id,member_id) VALUES(?,?,?)",
+            "INSERT OR IGNORE INTO reactions(id,activity_id,member_id,created_at) VALUES(?,?,?,?)",
             uid(),
             a.id,
             me.id,
+            now,
           );
           // One notice per supporter and activity; toggling never repeats it.
           await queueSocialNotice(

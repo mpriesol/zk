@@ -9,7 +9,7 @@ Výpočty sú v `lib/gamification.ts`, kalendárne pomocné funkcie v `lib/dates
 | Pravidelnosť · krištáľ | 3 rôzne dni so zaznamenaným pohybom | Raz za týždeň, pondelok–nedeľa | Pravidelnosť, bez dennej série; ľubovoľný pohyb |
 | Pohyb · smaragd | 2 prechádzky, túry alebo behy, každá aspoň 30 minút | Raz za týždeň | Jediná športová odmena za pohyb po vlastných; bez hornej hranice trvania |
 | Sila · jantár | 2 cvičenia, každé aspoň 15 minút | Raz za týždeň | Doplnkové cvičenie; stačí domáce cvičenie s vlastnou váhou alebo mobilita |
-| Pestrosť · ametyst | 3 pohyby po vlastných ≥30 min a 3 cvičenia ≥15 min | Raz za celú prípravu | Kombinácia dvoch odlišných oblastí, nie druhá odmena za dlhšiu túru |
+| Pestrosť · ametyst | 10 pohybov po vlastných ≥30 min a 8 cvičení ≥15 min (predvolené od 23. 11. 2026; predtým 3 + 3) | Raz za celú prípravu | Kombinácia dvoch odlišných oblastí, nie druhá odmena za dlhšiu túru |
 | Výbava · zafír | Skontrolovať zoznam, vrstvy oblečenia a plán doplnenia alebo požičania chýbajúcich vecí; dobrovoľne potvrdiť | Raz za celú prípravu | Praktická príprava; bez povinného nákupu a bez súvisu s tajnými bonusmi |
 
 Tri týždenné odmeny možno získať aj v neúplnom okrajovom týždni prípravy, ale ich podmienky sa automaticky neznižujú. Každé obdobie je nezávislé. Prázdny týždeň nevymaže staršie odmeny ani nenuluje dlhodobú Pestrosť. Prázdny denník znamená **bez zápisu**, nie bez pohybu.
@@ -44,10 +44,10 @@ Manuálne ukončenie skracuje obdobie na aktuálny deň v časovej zóne kurzu *
 
 | Prípad | Výsledok |
 |---|---|
-| Nebežec: tri 30-minútové prechádzky a tri 15-minútové domáce cvičenia v aspoň troch dňoch; kontrola výbavy | Dostupných všetkých päť základných odmien bez behu a plateného vybavenia |
+| Nebežec: počas prípravy desať 30-minútových prechádzok a osem 15-minútových domácich cvičení, týždenne v aspoň troch dňoch; kontrola výbavy | Dostupných všetkých päť základných odmien bez behu a plateného vybavenia |
 | Tri 90-minútové behy v troch dňoch týždňa | Pravidelnosť a Pohyb; žiadna druhá odmena za dlhý beh, bez cvičenia nevznikne Sila ani Pestrosť |
 | Pohyb v prvom týždni, druhý bez zápisu, návrat v treťom | Prvý týždeň ostáva splnený; tretí môže byť splnený nezávisle; žiadny reset alebo trest |
-| Jediná 240-minútová sobotná túra | Pravidelnosť 1/3; Pohyb 1/2; Sila 0/2; jedna časť Pestrosti 1/3; žiadne dvojité športové odmeny |
+| Jediná 240-minútová sobotná túra | Pravidelnosť 1/3; Pohyb 1/2; Sila 0/2; jedna časť Pestrosti 1/10; žiadne dvojité športové odmeny |
 
 ## Rozhranie a overenie
 

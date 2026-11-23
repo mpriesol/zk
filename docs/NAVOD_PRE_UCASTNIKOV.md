@@ -4,7 +4,7 @@ Verzia: 22. 11. 2026 · screenshoty sú zo skutočnej aplikácie s ukážkovými
 
 [Otvoriť verziu na vytlačenie](../public/navod.html)
 
-Dole v appke je päť tlačidiel: **Spolu** (čo robí skupina), **Prehľad** (týždeň po ľuďoch), **+** (nový zápis), **Výzvy** a **Ja** (tvoja príprava a nastavenia).
+Dole v appke je päť tlačidiel: **Spolu** (čo robí skupina), **Prehľad** (týždeň po účastníkoch), **+** (nový zápis), **Výzvy** a **Ja** (tvoja príprava a nastavenia).
 
 **Pri prvom príchode:** otvor odkaz od organizátora a vyber **Prihlásiť sa**, prípadne **Vytvoriť účet**. Bez platnej pozvánky nový účet čaká na schválenie; potom použi **Skontrolovať schválenie**. Ak je tvoja prezývka už obsadená a účet patrí tebe, prihlás sa doň.
 
@@ -12,25 +12,25 @@ Dole v appke je päť tlačidiel: **Spolu** (čo robí skupina), **Prehľad** (t
 
 ![Spolu](../public/navod/1-spolu.webp)
 
-Karta **Dnes v skupine** ukáže, koľko ľudí sa dnes hýbalo, aké aktivity pribudli a kto ich zapísal. Pod ňou sú aktivity všetkých, zoradené po dňoch. Cez **Filtrovať** vyberieš človeka, typ alebo obdobie.
+Karta **Dnes v skupine** ukáže, koľko účastníkov sa dnes hýbalo, aké aktivity pribudli a kto ich zapísal. Pod ňou sú aktivity všetkých, zoradené po dňoch. Cez **Filtrovať** vyberieš účastníka, typ alebo obdobie.
 
 ## 2. Podpor a komentuj
 
 ![Karta aktivity](../public/navod/2-karta.webp)
 
-Pod aktivitou stlač **Podporiť** alebo **Komentovať**. Vidíš, kto už podporil, a posledné dva komentáre; ostatné otvoríš cez počet komentárov. Klepnutím na meno otvoríš prípravu človeka.
+Pod aktivitou stlač **Podporiť** alebo **Komentovať**. Vidíš, kto už podporil, a posledné dva komentáre; ostatné otvoríš cez počet komentárov. Klepnutím na meno otvoríš prípravu účastníka.
 
 ## 3. Zapíš aktivitu tlačidlom +
 
 ![Nový zápis](../public/navod/3-novy-zapis.webp)
 
-Vyber typ, deň (**Dnes**, **Včera** alebo **Iný deň**) a prípadne trvanie, napríklad **90 min** alebo **1,5 hod**. Pridať môžeš vzdialenosť, poznámku a najviac päť fotografií (JPEG, PNG, WebP do 10 MB). Stlač **Uložiť**. Svoj zápis upravíš alebo zmažeš cez tri bodky na jeho karte.
+Vyber typ, deň (**Dnes**, **Včera** alebo **Iný deň**) a trvanie: nový zápis má predvolených **30 min**, zmeň ho podľa skutočnosti, napríklad **90 min** alebo **1,5 hod**. Prepínač **min / hod** mení len jednotku, napísané číslo ostane. Pridať môžeš vzdialenosť, poznámku a najviac päť fotografií (JPEG, PNG, WebP do 10 MB). Stlač **Uložiť**. Svoj zápis upravíš alebo zmažeš cez tri bodky na jeho karte.
 
 ## 4. Prehľad skupiny
 
 ![Prehľad](../public/navod/4-prehlad.webp)
 
-Jeden riadok na človeka a 7 políčok týždňa, zoradené podľa prezývky. Hore prepneš **Týždeň / Mesiac**; appka si voľbu zapamätá. Potiahnutím prstom doprava sa posunieš o týždeň späť. Rohy políčka: vločka = otužovanie, fotoaparát = fotka, bublina = komentár, červené srdiečko = tvoja podpora. Klepnutím na políčko otvoríš deň, na meno celú prípravu človeka.
+Jeden riadok na účastníka a 7 políčok týždňa, zoradené podľa prezývky. Hore prepneš **Týždeň / Mesiac**; appka si voľbu zapamätá. Týždne sa dajú prstom posúvať doľava a doprava cez celú prípravu; šípky a **Dnes** robia to isté. Rohy políčka: vločka = otužovanie, fotoaparát = fotka, bublina = komentár, červené srdiečko = tvoja podpora. Klepnutím na políčko otvoríš deň, na meno celú prípravu účastníka; klepnutím na jeho fotku ju zväčšíš.
 
 ## 5. Výzvy a odmeny
 
@@ -40,7 +40,7 @@ Drahokamy tohto týždňa a celej prípravy aj to, čo ešte chýba. Klepnutím 
 
 ## 6. Pridaj vločku
 
-Keď organizátor sprístupní otužovanie, v okne **Nový zápis** pribudne riadok **Otužovanie** s tlačidlom **+ vločka**. Jeden človek pridá jednu vločku denne; otužovanie nepridáva tréningové minúty. Zimnú krajinu a **Moje vločky** nájdeš v Prehľade.
+Keď organizátor sprístupní otužovanie, v okne **Nový zápis** pribudne riadok **Otužovanie** s tlačidlom **+ vločka**. Jeden účastník pridá jednu vločku denne; otužovanie nepridáva tréningové minúty. Zimnú krajinu a **Moje vločky** nájdeš v Prehľade.
 
 ## 7. Ja: tvoja príprava a nastavenia
 
@@ -54,7 +54,7 @@ Hore je **Appka na ploche** (tlačidlo **Nainštalovať**) a **Upozornenia** (tl
 
 ![Správy](../public/navod/7-spravy.webp)
 
-Zvonček hore otvorí správy organizátorov; dôležitá správa je aj ako pruh na začiatku Spolu. Zvoľ **Beriem na vedomie · archivovať**; správa ostane v tvojom **Archíve** a ostatným sa nič nemení.
+Zvonček hore otvorí správy organizátorov; dôležitá správa je aj ako pruh na začiatku Spolu. Záložka **Notifikácie** ukáže, kto podporil alebo okomentoval tvoje aktivity, aj keď nemáš zapnuté upozornenia v telefóne; klepnutím otvoríš aktivitu. Zvoľ **Beriem na vedomie · archivovať**; správa ostane v tvojom **Archíve** a ostatným sa nič nemení.
 
 ---
 

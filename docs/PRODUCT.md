@@ -6,14 +6,14 @@ Jeden aktuálny kurz s identifikátorom `COURSE_ID`, dospelí pozvaní účastn�
 
 Hlavná navigácia (od 22. 11. 2026) má päť stále viditeľných položiek: **Spolu · Prehľad · + · Výzvy · Ja**. Správy sú pod zvončekom, administrácia v Ja a v bočnom paneli na desktope. Staré odkazy `?view=home|group|challenges|me` sa presmerujú na nové obrazovky.
 
-- **Spolu:** pruh dôležitej správy, karta Dnes v skupine (ľudia, aktivity podľa typu, kto zapísal, otužovanie zvlášť, zapojenie v týždni), denné motto a chronologický feed po dňoch s podporou, komentármi a filtrom.
-- **Prehľad:** týždeň alebo mesiac po ľuďoch, abecedne; detail dňa/človeka, zimná krajina otužovania a spoločné štatistiky. Voľby sa pamätajú pre aktuálneho člena.
-- **+ / Nový zápis:** spodný panel s mriežkou typov, Dnes/Včera/Iný deň, trvanie min/hod, fotografie a samostatný riadok pre vločku.
+- **Spolu:** pruh dôležitej správy, karta Dnes v skupine (účastníci, aktivity podľa typu, kto zapísal, otužovanie zvlášť, zapojenie v týždni), denné motto a chronologický feed po dňoch s podporou, komentármi a filtrom.
+- **Prehľad:** týždeň (vodorovne posúvateľný cez celú prípravu, predvolený) alebo mesiac po účastníkoch, abecedne; detail dňa/účastníka s fotkou na zväčšenie, zimná krajina otužovania a spoločné štatistiky. Voľby sa pamätajú pre aktuálneho člena.
+- **+ / Nový zápis:** spodný panel s mriežkou typov, Dnes/Včera/Iný deň, trvanie min/hod (nový zápis 30 min, prepnutie jednotky ponechá číslo), fotografie a samostatný riadok pre vločku.
 - **Výzvy:** drahokamy týždňa a prípravy s detailom pravidiel, osobné ocenenia, výzvy organizátorov a zbierka.
 - **Ja:** vlastný týždeň/mesiac, kalendár, štatistiky, vlastné zápisy, profil, upozornenia, heslo, návod, administrácia a odhlásenie.
 - **Výzvy a odmeny:** päť pôvodných drahokamov, presné podmienky a započítané záznamy, publikované výzvy, praktické odznaky, osobné ocenenia a história odmien.
 - **Profil a nastavenia:** prezývka, fotografia s výrezom, heslo, animácie medvedíka/osláv, dobrovoľný push a odhlásenie. Pôvodný tab Ja sa nepoužíva.
-- **Správy:** vlastné doručené správy a osobný archív. Potvrdenie pripnutej správy ju skryje len aktuálnemu človeku.
+- **Správy:** vlastné doručené správy, osobný archív a Notifikácie (podpora a komentáre k mojim aktivitám, pre všetkých bez ohľadu na push; „nové“ sa pamätajú v zariadení). Potvrdenie pripnutej správy ju skryje len aktuálnemu človeku.
 - **Administrácia:** členovia/pozvánky, termíny, typy, verzované pravidlá, vizuály, výzvy, osobné ocenenia, citáty, správy, štatistiky/nominácie, audit, CSV a samostatný potvrdený štart novej prípravy. Prepínač účastníckeho zobrazenia je hore; serverové oprávnenia sa nemenia.
 
 ## Dáta a súkromie
@@ -36,7 +36,7 @@ Päť odmien: **Pravidelnosť, Pohyb, Sila, Pestrosť, Výbava**. Presné pravid
 
 Odmena môže byť drahokam, symbol s farbou alebo autorizovaný vlastný obrázok. Praktické vlastné potvrdenia a organizačné poďakovania majú vlastné podmienky a snapshoty; 13 východiskových šablón je najprv draft. Administrátorské maximá a nominácie majú presné definície, remízy a rozdelenie medzi oprávnených kandidátov. Verejný rebríček nevzniká.
 
-Osem východiskových mott má doloženého autora/dielo, zdroj a označený slovenský preklad. Denný výber sa riadi časovým pásmom kurzu, poradie a interval upraví admin. Už zobrazený citát je pre celý miestny deň stabilný.
+Osem východiskových mott má doloženého autora/dielo, zdroj a označený slovenský preklad; v appke sa zobrazuje iba text a autor. Denný výber sa riadi časovým pásmom kurzu, poradie a interval upraví admin. Už zobrazený citát je pre celý miestny deň stabilný.
 
 Ročník, príprava a hlavná udalosť majú samostatné dátumy. Existujúca príprava sa aktualizáciou nemaže. Nový štart má presný desaťminútový náhľad, explicitné potvrdenie a povinnú úplnú zálohu. Zachová prihlásenie konajúceho organizátora, účty iných kurzov a konfiguráciu; voliteľne členov rovnakej skupiny. Výmaz dát a zmena obdobia sú jedna transakcia. Pozri ADMINISTRATOR.md.
 

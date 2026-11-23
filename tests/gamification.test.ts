@@ -67,10 +67,28 @@ test("non-runner can earn every basic reward with walks, home exercise and pract
     activity("2026-10-20", "exercise", 15),
     activity("2026-10-22", "exercise", 15),
     activity("2026-10-24", "exercise", 15),
+    // Variety spans the whole preparation: roughly one walk and one home
+    // workout a week afterwards.
+    ...[
+      "2026-10-27",
+      "2026-11-03",
+      "2026-11-10",
+      "2026-11-17",
+      "2026-11-24",
+      "2026-12-01",
+      "2026-12-08",
+    ].map((date) => activity(date)),
+    ...[
+      "2026-10-29",
+      "2026-11-05",
+      "2026-11-12",
+      "2026-11-19",
+      "2026-11-26",
+    ].map((date) => activity(date, "exercise", 15)),
   ];
   for (const rule of defaultRules(course.startDate)) {
     assert.equal(
-      evaluateRule(rule, records, course, "2026-10-25", 1)[0].progress.complete,
+      evaluateRule(rule, records, course, "2026-12-09", 1)[0].progress.complete,
       true,
       rule.name,
     );

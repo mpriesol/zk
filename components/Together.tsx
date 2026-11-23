@@ -1,12 +1,6 @@
 "use client";
 import { useState } from "react";
-import {
-  ArrowUpRight,
-  Bell,
-  Check,
-  ChevronRight,
-  Snowflake,
-} from "lucide-react";
+import { Bell, Check, ChevronRight, Snowflake } from "lucide-react";
 import type { Activity, AppState, Member } from "../lib/types";
 import { Avatar, SportIcon, fmt, add, monday, type Action } from "./ui";
 import Feed, { plural } from "./Feed";
@@ -82,9 +76,9 @@ function TodaySummary({
           <small>
             {plural(
               peopleIds.length,
-              "človek sa hýbal",
-              "ľudia sa hýbali",
-              "ľudí sa hýbalo",
+              "účastník sa hýbal",
+              "účastníci sa hýbali",
+              "účastníkov sa hýbalo",
             )}
           </small>
         </div>
@@ -142,7 +136,7 @@ function TodaySummary({
         <span>
           <strong>
             Tento týždeň {weekPeople} z {members.length}{" "}
-            {plural(members.length, "človeka", "ľudí", "ľudí")}
+            {plural(members.length, "účastníka", "účastníkov", "účastníkov")}
           </strong>
           <small>
             sa aspoň raz hýbalo · {weekMovement.length}{" "}
@@ -152,7 +146,7 @@ function TodaySummary({
         <span
           className="cz-bars"
           role="img"
-          aria-label={`Počet ľudí s pohybom po dňoch: ${weekDays.map((d, i) => `${fmt(d, { weekday: "short" })} ${perDay[i]}`).join(", ")}`}
+          aria-label={`Počet účastníkov s pohybom po dňoch: ${weekDays.map((d, i) => `${fmt(d, { weekday: "short" })} ${perDay[i]}`).join(", ")}`}
         >
           {weekDays.map((d, i) => (
             <span
@@ -259,11 +253,7 @@ export default function Together({
       />
       {state.motto && (
         <p className="cz-motto">
-          <q>{state.motto.text}</q> · {state.motto.author} ·{" "}
-          <a href={state.motto.sourceUrl} target="_blank" rel="noreferrer">
-            {state.motto.translation ? "zdroj, náš preklad" : "zdroj"}
-            <ArrowUpRight size={11} aria-hidden="true" />
-          </a>
+          <q>{state.motto.text}</q> · {state.motto.author}
         </p>
       )}
       {missingFocus && (

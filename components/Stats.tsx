@@ -30,7 +30,7 @@ export default function Stats({
 }) {
   const [range, setRange] = usePreference<"week" | "month" | "all">(
     `cz-${preferenceKey}-range`,
-    "month",
+    "week",
     ["week", "month", "all"],
   );
   const [anchor, setAnchor] = useState(today);
@@ -110,7 +110,13 @@ export default function Stats({
         {group && (
           <div>
             <strong>{s.people}</strong>
-            <span>ľudí so zápisom</span>
+            <span>
+              {s.people === 1
+                ? "účastník so zápisom"
+                : s.people >= 2 && s.people <= 4
+                  ? "účastníci so zápisom"
+                  : "účastníkov so zápisom"}
+            </span>
           </div>
         )}
       </div>
@@ -118,7 +124,7 @@ export default function Stats({
         {s.missingMinutes
           ? `${s.missingMinutes} pohybových zápisov nemá uvedené trvanie. Súčet minút je neúplný.`
           : "Minúty vychádzajú z vyplneného trvania pohybových aktivít."}{" "}
-        Viac aktivít v rovnaký deň tvorí jeden pohybový deň človeka.
+        Viac aktivít v rovnaký deň tvorí jeden pohybový deň účastníka.
       </p>
       {showCalendar && !group && range !== "all" && (
         <ActivityCalendar

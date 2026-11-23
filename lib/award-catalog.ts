@@ -64,7 +64,7 @@ export const DEFAULT_PERSONAL_AWARDS: Omit<
   {
     name: "Čajový diplomat",
     description:
-      "Poďakovanie za konkrétnu pomoc pri spoločnom čaji alebo občerstvení, napríklad prípravu či rozdelenie medzi ľudí. Organizátor pri udelení opíše, za čo ďakuje.",
+      "Poďakovanie za konkrétnu pomoc pri spoločnom čaji alebo občerstvení, napríklad prípravu či rozdelenie medzi účastníkov. Organizátor pri udelení opíše, za čo ďakuje.",
     visual: { kind: "icon", value: "flame" },
     mode: "organizer",
     status: "draft",
@@ -96,7 +96,7 @@ export const DEFAULT_PERSONAL_AWARDS: Omit<
   {
     name: "Pokojný prístav",
     description:
-      "Poďakovanie človeku, ktorý pri zmene plánu pomohol skupine zrozumiteľne dohodnúť ďalší postup. Organizátor uvedie konkrétnu situáciu a prínos.",
+      "Poďakovanie účastníkovi, ktorý pri zmene plánu pomohol skupine zrozumiteľne dohodnúť ďalší postup. Organizátor uvedie konkrétnu situáciu a prínos.",
     visual: { kind: "icon", value: "compass" },
     mode: "organizer",
     status: "draft",

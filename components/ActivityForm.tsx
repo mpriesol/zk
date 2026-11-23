@@ -36,12 +36,13 @@ export default function ActivityForm({
     activity?.date ||
       (state.today < state.course.endDate ? state.today : state.course.endDate),
   );
+  // New entries start at 30 minutes; editing keeps the stored value.
   const [duration, setDuration] = useState(
-    displayDuration(activity?.minutes ?? null, "min"),
+    activity ? displayDuration(activity.minutes ?? null, "min") : "30",
   );
   const [unit, setUnit] = useState<DurationUnit>("min");
   const [canonicalMinutes, setCanonicalMinutes] = useState<number | null>(
-    activity?.minutes ?? null,
+    activity ? (activity.minutes ?? null) : 30,
   );
   const [durationError, setDurationError] = useState("");
   const [photos, setPhotos] = useState<MediaSelection[]>(() =>
@@ -152,14 +153,18 @@ export default function ActivityForm({
     () => !chips.some((c) => c.date === date),
   );
   const showDistance = selectedType?.group !== "exercise" || distance !== "";
+  /** The typed number stays; only its unit changes (3 min → 3 hod). */
   function changeUnit(next: DurationUnit) {
     if (next === unit) return;
-    if (durationError) {
-      setError(durationError);
-      return;
-    }
     setUnit(next);
-    setDuration(displayDuration(canonicalMinutes, next));
+    try {
+      setCanonicalMinutes(parseDuration(duration, next));
+      setDurationError("");
+    } catch (error) {
+      setDurationError(
+        error instanceof Error ? error.message : "Skontroluj trvanie.",
+      );
+    }
   }
   return (
     <Modal
@@ -279,7 +284,9 @@ export default function ActivityForm({
                 ? durationError
                 : canonicalMinutes !== null && unit === "hour"
                   ? `= ${canonicalMinutes} minút`
-                  : "nepovinné, v minútach alebo hodinách"}
+                  : !activity && canonicalMinutes === 30 && unit === "min"
+                    ? "predvolených 30 minút, zmeň podľa skutočnosti"
+                    : "nepovinné, v minútach alebo hodinách"}
             </small>
           </div>
           {showDistance && (
